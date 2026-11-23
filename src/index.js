@@ -301,6 +301,13 @@ export default {
       try { return await handleApi(request, env, url); }
       catch (error) { console.error("API error:", error); return json({ error: "خطای داخلی سرور رخ داد." }, 500); }
     }
-    return env.ASSETS.fetch(request);
+    if (!env.FILES) return new Response("Storage unavailable", { status: 503 });
+    const assetPath = url.pathname === "/" ? "/index.html" : url.pathname;
+    const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html"]);
+    if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
+    const asset = await env.FILES.get("static" + assetPath, "text");
+    if (asset === null) return new Response("Not Found", { status: 404 });
+    const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
+    return new Response(asset, { headers: { "content-type": contentType, "cache-control": assetPath.endsWith(".html") ? "no-cache" : "public, max-age=3600", "x-content-type-options": "nosniff" } });
   }
 };
