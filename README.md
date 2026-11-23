@@ -7,19 +7,19 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - Admin tools for reviewing submissions, suspending/reactivating users, archiving published sources, and inspecting audit history.
 - Password hashing with PBKDF2, hashed opaque sessions, HttpOnly/Secure/SameSite cookies, and server-side role checks.
 - D1 schema and first migration.
-- R2-backed private ZIP submissions (5 MiB limit), pending review, approve/reject workflow, published download endpoint, user notifications, and audit log.
+- Cloudflare KV-backed private ZIP submissions (5 MiB limit; KV is eventually consistent and intended for small/medium ZIP files), pending review, approve/reject workflow, published download endpoint, user notifications, and audit log.
 - Owner bootstrap protected by deployment-only secrets.
 
 ## Stack
 - Cloudflare Workers + Static Assets
 - Cloudflare D1
-- Cloudflare R2
+- Cloudflare Workers KV (ZIP object storage)
 - Vanilla HTML/CSS/JavaScript
 
 ## Local development
 1. Install Node.js LTS and Wrangler: `npm install` is not required; run `npx wrangler dev`.
-2. Create a D1 database and an R2 bucket in your Cloudflare account.
-3. Update the D1 `database_id` in `wrangler.toml` and ensure the bucket name matches.
+2. Create a D1 database and a Workers KV namespace in your Cloudflare account.
+3. Update the D1 `database_id` and KV namespace `id` in `wrangler.toml`.
 4. Apply the migration: `npx wrangler d1 migrations apply fxi-botforge-db --local`.
 5. Create a local `.dev.vars` file (never commit it):
    ```
@@ -29,8 +29,8 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 6. Start the app: `npx wrangler dev`.
 
 ## Cloudflare setup
-1. Create a D1 database named `fxi-botforge-db` and an R2 bucket named `fxi-botforge-files`.
-2. Copy the D1 database ID into `wrangler.toml` in place of `REPLACE_WITH_D1_DATABASE_ID`.
+1. Create a D1 database named `fxi-botforge-db` and a Workers KV namespace named `fxi-botforge-files`.
+2. Confirm the D1 database ID and KV namespace ID in `wrangler.toml` match your Cloudflare account.
 3. Run `npx wrangler d1 migrations apply fxi-botforge-db --remote`.
 4. Add Worker secrets `BOOTSTRAP_OWNER_EMAIL` and `BOOTSTRAP_OWNER_PASSWORD` in Worker Settings → Variables and Secrets. Use a unique password; do not put secrets in GitHub.
 5. Deploy the Worker with `npx wrangler deploy` (or connect the repository through Workers Builds).
@@ -50,10 +50,10 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - `POST /api/admin/users/:id/suspend|activate`, `POST /api/admin/bots/:id/archive`
 
 ## Security notes
-- Uploaded ZIP files stay in a private R2 bucket until approved.
+- Uploaded ZIP files stay in a private Workers KV namespace until approved. KV is eventually consistent; allow a short propagation delay after upload or approval.
 - Current ZIP validation checks extension, size, and ZIP signature only. It is not malware scanning or a full archive integrity inspection. Review uploaded source code before approving it.
 - No user-supplied file is executed by the platform.
-- Use HTTPS in production. Keep D1 and R2 private; do not expose bucket credentials.
+- Use HTTPS in production. Keep the KV namespace and D1 binding server-side; do not expose storage credentials.
 - Add rate limiting / Turnstile and automated dependency or secret scanning before opening the service to large-scale public use.
 
 ## Current limitations
