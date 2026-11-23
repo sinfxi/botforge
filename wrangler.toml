@@ -13,9 +13,9 @@ database_name = "fxi-botforge-db"
 database_id = "14c0b664-7596-4da9-83fb-0b3f263541fb"
 migrations_dir = "database/migrations"
 
-[[r2_buckets]]
+[[kv_namespaces]]
 binding = "FILES"
-bucket_name = "fxi-botforge-files"
+id = "cddb77b5a9e844baba60bad46c03e0df"
 
 [vars]
 APP_NAME = "FXI BotForge"
