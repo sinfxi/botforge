@@ -3,7 +3,8 @@
 FXI BotForge is a Persian-first community platform for discovering and sharing Telegram bot source projects.
 
 ## Implemented
-- Persian RTL responsive landing page, sign-in and registration, personal dashboard, and administrator review dashboard.
+- Persian RTL responsive landing page with live catalog search/category filters, sign-in and registration, personal dashboard, and administrator dashboard.
+- Admin tools for reviewing submissions, suspending/reactivating users, archiving published sources, and inspecting audit history.
 - Password hashing with PBKDF2, hashed opaque sessions, HttpOnly/Secure/SameSite cookies, and server-side role checks.
 - D1 schema and first migration.
 - R2-backed private ZIP submissions (5 MiB limit), pending review, approve/reject workflow, published download endpoint, user notifications, and audit log.
@@ -41,11 +42,12 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - `/login.html` sign in / register
 - `/setup-owner.html` one-time owner bootstrap
 - `/dashboard.html` upload submissions, review status, notifications
-- `/admin.html` moderation queue, overview, audit log
+- `/admin.html` moderation queue, overview, user management, source management, audit log
 - `GET /api/bots`, `GET /api/bots/:slug/download`
 - `POST /api/submissions`, `GET /api/my/submissions`
-- `GET /api/admin/overview`, `GET /api/admin/submissions`
+- `GET /api/admin/overview`, `GET /api/admin/submissions`, `GET /api/admin/users`, `GET /api/admin/bots`
 - `POST /api/admin/submissions/:id/approve|reject`
+- `POST /api/admin/users/:id/suspend|activate`, `POST /api/admin/bots/:id/archive`
 
 ## Security notes
 - Uploaded ZIP files stay in a private R2 bucket until approved.
