@@ -71,7 +71,7 @@ async function handleApi(request, env, url) {
   if (path === "/api/health" && method === "GET") {
     try {
       await env.DB.prepare("SELECT 1").first();
-      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "configured" : "missing" });
+      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing" });
     } catch { return json({ ok: false, database: "unavailable" }, 503); }
   }
 
@@ -155,7 +155,7 @@ async function handleApi(request, env, url) {
     if (!(head[0] === 0x50 && head[1] === 0x4b && [0x03,0x05,0x07].includes(head[2]) && [0x04,0x06,0x08].includes(head[3]))) return json({ error: "ساختار فایل ZIP معتبر نیست." }, 400);
     const submissionId = id();
     const objectKey = `pending/${auth.user.id}/${submissionId}.zip`;
-    await env.FILES.put(objectKey, bytes, { httpMetadata: { contentType: "application/zip" }, customMetadata: { uploader: auth.user.id, submissionId } });
+    await env.FILES.put(objectKey, bytes);
     try {
       await env.DB.prepare("INSERT INTO submissions (id,user_id,title,description,category,object_key,original_filename,file_size,rights_confirmed) VALUES (?,?,?,?,?,?,?,?,1)")
         .bind(submissionId, auth.user.id, title, description, category, objectKey, safeFilename(file.name) || "source.zip", file.size).run();
@@ -194,11 +194,11 @@ async function handleApi(request, env, url) {
   if (download && method === "GET") {
     const bot = await env.DB.prepare("SELECT title,object_key,original_filename FROM bots WHERE slug=? AND status='published'").bind(download[1]).first();
     if (!bot || !env.FILES) return json({ error: "فایل پیدا نشد." }, 404);
-    const object = await env.FILES.get(bot.object_key);
+    const object = await env.FILES.get(bot.object_key, "arrayBuffer");
     if (!object) return json({ error: "فایل در دسترس نیست." }, 404);
     await audit(env, null, "bot.download", "bot", download[1]);
     const encodedName = encodeURIComponent(bot.original_filename || "source.zip");
-    return new Response(object.body, { headers: { "content-type": "application/zip", "content-disposition": "attachment; filename=\"source.zip\"; filename*=UTF-8''" + encodedName, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+    return new Response(object, { headers: { "content-type": "application/zip", "content-disposition": "attachment; filename=\"source.zip\"; filename*=UTF-8''" + encodedName, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
 
   if (path.startsWith("/api/admin/")) {
@@ -236,9 +236,9 @@ async function handleApi(request, env, url) {
       }
       const slug = `${slugify(submission.title)}-${submission.id.slice(0,8)}`;
       const publishedKey = `published/${slug}.zip`;
-      const source = await env.FILES?.get(submission.object_key);
+      const source = await env.FILES?.get(submission.object_key, "arrayBuffer");
       if (!source) return json({ error: "فایل خصوصی درخواست پیدا نشد." }, 409);
-      await env.FILES.put(publishedKey, source.body, { httpMetadata: { contentType: "application/zip" } });
+      await env.FILES.put(publishedKey, source);
       try {
         await env.DB.prepare("INSERT INTO bots (id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES (?,?,?,?,?,?,?,?,?)")
           .bind(id(), slug, submission.title, submission.description, submission.category, publishedKey, submission.original_filename, submission.file_size, submission.user_id).run();
