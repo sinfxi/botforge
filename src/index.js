@@ -257,7 +257,7 @@ async function handleApi(request, env, url) {
       const { results } = await env.DB.prepare("SELECT id,email,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
       return json({ items: results || [] });
     }
-    const userStatus = path.match(/^\\/api\\/admin\\/users\\/([0-9a-f-]+)\\/(suspend|activate)$/i);
+    const userStatus = path.match(/^\/api\/admin\/users\/([0-9a-f-]+)\/(suspend|activate)$/i);
     if (userStatus && method === "POST") {
       if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
       if (userStatus[1] === admin.user.id) return json({ error: "نمی‌توانی حساب خودت را غیرفعال کنی." }, 400);
@@ -274,7 +274,7 @@ async function handleApi(request, env, url) {
       const { results } = await env.DB.prepare("SELECT id,slug,title,category,file_size,status,published_at FROM bots ORDER BY published_at DESC LIMIT 200").all();
       return json({ items: results || [] });
     }
-    const archiveBot = path.match(/^\\/api\\/admin\\/bots\\/([0-9a-f-]+)\\/archive$/i);
+    const archiveBot = path.match(/^\/api\/admin\/bots\/([0-9a-f-]+)\/archive$/i);
     if (archiveBot && method === "POST") {
       if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
       const bot = await env.DB.prepare("SELECT id,title,object_key FROM bots WHERE id=? AND status='published'").bind(archiveBot[1]).first();
