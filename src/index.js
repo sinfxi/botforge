@@ -251,6 +251,37 @@ async function handleApi(request, env, url) {
       await audit(env, admin.user.id, "submission.approve", "submission", submission.id, { slug });
       return json({ ok: true, slug });
     }
+    if (path === "/api/admin/users" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT id,email,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
+      return json({ items: results || [] });
+    }
+    const userStatus = path.match(/^\\/api\\/admin\\/users\\/([0-9a-f-]+)\\/(suspend|activate)$/i);
+    if (userStatus && method === "POST") {
+      if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+      if (userStatus[1] === admin.user.id) return json({ error: "نمی‌توانی حساب خودت را غیرفعال کنی." }, 400);
+      const target = await env.DB.prepare("SELECT id,email,role FROM users WHERE id=?").bind(userStatus[1]).first();
+      if (!target) return json({ error: "کاربر پیدا نشد." }, 404);
+      if (target.role === "owner" && admin.user.role !== "owner") return json({ error: "فقط مالک می‌تواند حساب مالک را تغییر دهد." }, 403);
+      const status = userStatus[2].toLowerCase() === "suspend" ? "suspended" : "active";
+      await env.DB.prepare("UPDATE users SET status=?,updated_at=? WHERE id=?").bind(status, now(), target.id).run();
+      if (status === "suspended") await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
+      await audit(env, admin.user.id, "user." + status, "user", target.id, { email: target.email });
+      return json({ ok: true, status });
+    }
+    if (path === "/api/admin/bots" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT id,slug,title,category,file_size,status,published_at FROM bots ORDER BY published_at DESC LIMIT 200").all();
+      return json({ items: results || [] });
+    }
+    const archiveBot = path.match(/^\\/api\\/admin\\/bots\\/([0-9a-f-]+)\\/archive$/i);
+    if (archiveBot && method === "POST") {
+      if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+      const bot = await env.DB.prepare("SELECT id,title,object_key FROM bots WHERE id=? AND status='published'").bind(archiveBot[1]).first();
+      if (!bot) return json({ error: "سورس منتشرشده پیدا نشد." }, 404);
+      await env.DB.prepare("UPDATE bots SET status='archived' WHERE id=?").bind(bot.id).run();
+      await env.FILES?.delete(bot.object_key);
+      await audit(env, admin.user.id, "bot.archive", "bot", bot.id, { title: bot.title });
+      return json({ ok: true });
+    }
     if (path === "/api/admin/audit" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT a.id,a.action,a.target_type,a.target_id,a.details_json,a.created_at,u.email AS actor_email FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 100").all();
       return json({ items: results || [] });
