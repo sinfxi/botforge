@@ -20,9 +20,10 @@ async function loadBots() {
     }
     list.innerHTML = items.map((bot) => `
       <article class="bot-card">
-        <span class="bot-meta">${escapeHtml(bot.category)}</span>
+        <span class="bot-meta">${escapeHtml(bot.category)} · ${(Number(bot.file_size) / 1024).toFixed(0)} KB</span>
         <h3>${escapeHtml(bot.title)}</h3>
         <p>${escapeHtml(bot.description)}</p>
+        <a class="text-link" href="/api/bots/${encodeURIComponent(bot.slug)}/download" download>دریافت فایل ZIP ←</a>
       </article>
     `).join("");
   } catch {
