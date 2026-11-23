@@ -10,7 +10,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "fxi-botforge-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "14c0b664-7596-4da9-83fb-0b3f263541fb"
 migrations_dir = "database/migrations"
 
 [[r2_buckets]]
