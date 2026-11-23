@@ -134,7 +134,7 @@ async function handleApi(request, env, url) {
 
   if (path === "/api/bots" && method === "GET") {
     const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
-    return json({ items: results || [] });
+    return json({ items: results || [] }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
   }
 
   if (path === "/api/submissions" && method === "POST") {
@@ -308,6 +308,7 @@ export default {
     const asset = await env.FILES.get("static" + assetPath, "text");
     if (asset === null) return new Response("Not Found", { status: 404 });
     const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
-    return new Response(asset, { headers: { "content-type": contentType, "cache-control": assetPath.endsWith(".html") ? "no-cache" : "public, max-age=3600", "x-content-type-options": "nosniff" } });
+    const cacheControl = assetPath.endsWith(".html") ? "public, max-age=60, stale-while-revalidate=300" : "public, max-age=3600, stale-while-revalidate=86400";
+    return new Response(asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff" } });
   }
 };
