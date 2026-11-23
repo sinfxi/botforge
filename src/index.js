@@ -196,7 +196,9 @@ async function handleApi(request, env, url) {
     if (!bot || !env.FILES) return json({ error: "فایل پیدا نشد." }, 404);
     const object = await env.FILES.get(bot.object_key);
     if (!object) return json({ error: "فایل در دسترس نیست." }, 404);
-    return new Response(object.body, { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="${bot.original_filename.replace(/["\\\\]/g, "_")}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+    await audit(env, null, "bot.download", "bot", download[1]);
+    const encodedName = encodeURIComponent(bot.original_filename || "source.zip");
+    return new Response(object.body, { headers: { "content-type": "application/zip", "content-disposition": "attachment; filename=\"source.zip\"; filename*=UTF-8''" + encodedName, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
 
   if (path.startsWith("/api/admin/")) {
