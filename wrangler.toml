@@ -1,0 +1,23 @@
+name = "fxi-botforge"
+main = "src/index.js"
+compatibility_date = "2026-11-23"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fxi-botforge-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "database"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "fxi-botforge-files"
+
+[vars]
+APP_NAME = "FXI BotForge"
+MAX_UPLOAD_BYTES = "5242880"
+SESSION_DAYS = "14"
