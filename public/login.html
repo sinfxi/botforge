@@ -54,6 +54,17 @@
     notice.style.display = "none";
     notice.textContent = "";
   }
+  async function diagnoseConnection() {
+    try {
+      const response = await fetch("/api/health", { credentials: "same-origin", cache: "no-store" });
+      const health = await response.json().catch(() => ({}));
+      if (response.ok && health.database === "connected") return "سرور BotForge و پایگاه داده متصل‌اند؛ درخواست ورود کامل نشد. صفحه را تازه‌سازی کن و دوباره تلاش کن.";
+      if (health.database === "unavailable") return "Worker در دسترس است، اما اتصال پایگاه داده D1 برقرار نیست. تنظیمات اتصال DB در Cloudflare باید بررسی شود.";
+      return health.error || "سرور پاسخ داد، اما وضعیت سرویس سالم نیست. چند لحظه بعد دوباره تلاش کن.";
+    } catch {
+      return "مرورگر به Worker سایت دسترسی پیدا نکرد. آدرس سایت و اتصال اینترنت را بررسی کن؛ اگر صفحه باز می‌شود ولی این پیام می‌آید، درخواست API در شبکه یا Cloudflare قطع شده است.";
+    }
+  }
   function setMode(nextMode) {
     registerMode = nextMode;
     $("#heading").textContent = registerMode ? "حساب تازه بساز." : "خوش برگشتی.";
@@ -107,9 +118,7 @@
         location.replace("/dashboard.html");
       }
     } catch (error) {
-      showNotice(error instanceof TypeError
-        ? "ارتباط با سرویس BotForge برقرار نشد. صفحه را تازه‌سازی کن؛ اگر ادامه داشت، وضعیت /api/health را بررسی می‌کنیم."
-        : error.message, "error");
+      showNotice(error instanceof TypeError ? await diagnoseConnection() : error.message, "error");
     } finally {
       busy = false;
       button.disabled = false;
