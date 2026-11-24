@@ -178,9 +178,7 @@
         } catch { return []; }
       })();
       $("#account-username").textContent = me.user.username;
-      $("#account-id").textContent = "شناسه: " + me.user.id;
-      $("#account-id").textContent = "شناسه: " + me.user.id;
-      $("#account-id").textContent = "شناسه: " + me.user.id;
+      $("#account-id").textContent = "شناسه: " + (me.user.public_id || "—");
       $("#account-role").textContent = isOwner ? "مالک اصلی · دسترسی کامل" : "مدیر محدود · دسترسی بر اساس مجوز";
       $(".identity-avatar").textContent = isOwner ? "O" : "M";
       showSection("manager-panel", isOwner);
@@ -218,7 +216,7 @@
     $("#manager-message").textContent = "در حال ایجاد حساب مدیر…";
     try {
       const created = await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ username:$("#manager-username").value.trim(), password:$("#manager-password").value, permissions }) });
-      $("#manager-message").textContent = "مدیر ساخته شد؛ شناسه کاربری: " + created.id + " — این شناسه را همراه نام کاربری و رمز به او بده.";
+      $("#manager-message").textContent = "مدیر ساخته شد؛ شناسه ۴ رقمی: " + (created.public_id || "—") + " — این شناسه را همراه نام کاربری و رمز به او بده.";
       event.currentTarget.reset();
       await loadManagers();
     } catch (error) { $("#manager-message").textContent = error.message; }
