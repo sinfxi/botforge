@@ -96,7 +96,7 @@
       username.focus();
       return;
     }
-    if (!registerMode && !/^[0-9a-f-]{36}$/i.test(userId.value.trim())) {
+    if (!registerMode && !/^[0-9]{4}$/.test(userId.value.trim())) {
       showNotice("شناسه کاربری باید دقیقاً ۴ رقم باشد.", "error");
       userId.focus();
       return;
