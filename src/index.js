@@ -499,10 +499,15 @@ export default {
     if (asset === null && env.FILES && Date.now() >= STATIC_KV_COOLDOWN_UNTIL) {
       try {
         const read = env.FILES.get("static" + assetPath, "text");
-        asset = await Promise.race([
-          read,
-          new Promise(resolve => setTimeout(() => resolve(null), 1200))
-        ]);
+        let timeoutId;
+        try {
+          asset = await Promise.race([
+            read,
+            new Promise(resolve => { timeoutId = setTimeout(() => resolve(null), 1200); })
+          ]);
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
         if (asset !== null) {
           source = "kv";
           STATIC_KV_COOLDOWN_UNTIL = 0;
