@@ -1,4 +1,4 @@
-const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin" };
 const MAX_UPLOAD = 5 * 1024 * 1024;
 
 function json(data, status = 200, headers = {}) {
@@ -238,7 +238,11 @@ async function handleApi(request, env, url) {
         const salt = id(), managerId = id();
         try {
           await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?, 'admin', ?)").bind(managerId,email,await passwordHash(password,salt),salt,JSON.stringify(permissions)).run();
-        } catch { return json({ error: "این ایمیل قبلاً ثبت شده یا ساخت مدیر ممکن نیست." }, 409); }
+        } catch (error) {
+          console.error("Manager creation failed:", error);
+          if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این ایمیل قبلاً در BotForge ثبت شده است." }, 409);
+          return json({ error: "ساخت حساب مدیر در پایگاه داده ناموفق بود. دوباره تلاش کن." }, 500);
+        }
         await audit(env,admin.user.id,"manager.create","user",managerId,{email,permissions});
         return json({ok:true,id:managerId},201);
       }
@@ -381,6 +385,6 @@ export default {
     if (asset === null) return new Response("Not Found", { status: 404 });
     const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
     const cacheControl = assetPath.endsWith(".html") ? "public, max-age=60, stale-while-revalidate=300" : "public, max-age=3600, stale-while-revalidate=86400";
-    return new Response(asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff" } });
+    return new Response(asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
   }
 };
