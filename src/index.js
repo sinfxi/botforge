@@ -52,9 +52,16 @@ async function requireAdmin(request, env) {
 }
 function safePermissions(value) { try { const p=JSON.parse(value || "null"); return Array.isArray(p) ? p.filter(x => ["submissions","users","bots","audit"].includes(x)) : ["submissions","users","bots","audit"]; } catch { return ["submissions","users","bots","audit"]; } }
 function sameOrigin(request) {
+  const requestUrl = new URL(request.url);
   const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try { return new URL(origin).host === new URL(request.url).host; } catch { return false; }
+  if (origin) {
+    try { return new URL(origin).origin === requestUrl.origin; } catch { return false; }
+  }
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try { return new URL(referer).origin === requestUrl.origin; } catch { return false; }
+  }
+  return false;
 }
 async function audit(env, actor, action, targetType = null, targetId = null, details = null) {
   await env.DB.prepare("INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, details_json) VALUES (?, ?, ?, ?, ?, ?)")
@@ -94,26 +101,31 @@ async function handleApi(request, env, url) {
   }
 
   if (path === "/api/auth/register" && method === "POST") {
-    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است. صفحه را از آدرس اصلی سایت باز و دوباره امتحان کن." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "اطلاعات نامعتبر است." }, 400);
+    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "ایمیل و رمز عبور را کامل وارد کن." }, 400);
     const email = body.email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || body.password.length < 10 || body.password.length > 200) return json({ error: "ایمیل معتبر و رمز عبور حداقل ۱۰ کاراکتری وارد کنید." }, 400);
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || body.password.length < 10 || body.password.length > 200) return json({ error: "ایمیل معتبر و رمز عبور حداقل ۱۰ کاراکتری وارد کن." }, 400);
     const salt = id();
     try {
       await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt) VALUES (?,?,?,?)")
         .bind(id(), email, await passwordHash(body.password, salt), salt).run();
-      return json({ ok: true, message: "حساب ساخته شد. حالا وارد شوید." }, 201);
-    } catch { return json({ error: "این ایمیل قبلاً ثبت شده یا ساخت حساب ممکن نیست." }, 409); }
+      return json({ ok: true, message: "حساب ساخته شد. حالا وارد شو." }, 201);
+    } catch (error) {
+      console.error("Registration failed:", error);
+      return json({ error: "این ایمیل قبلاً ثبت شده یا ذخیره حساب با مشکل روبه‌رو شده است." }, 409);
+    }
   }
 
   if (path === "/api/auth/login" && method === "POST") {
-    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است. صفحه را از آدرس اصلی سایت باز و دوباره امتحان کن." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "اطلاعات ورود نامعتبر است." }, 400);
+    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "ایمیل و رمز عبور را کامل وارد کن." }, 400);
+    const email = body.email.trim().toLowerCase();
+    if (email.length > 254 || body.password.length > 200) return json({ error: "اطلاعات ورود معتبر نیست." }, 400);
     const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE email = ?")
-      .bind(body.email.trim().toLowerCase()).first();
-    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "ایمیل یا رمز عبور اشتباه است." }, 401);
+      .bind(email).first();
+    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "ایمیل یا رمز عبور اشتباه است. اگر هنوز حساب نساخته‌ای، ابتدا ثبت‌نام کن." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
     await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)")
