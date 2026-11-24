@@ -33,6 +33,10 @@
     </section>
 
     <div id="page-message" class="workspace-message" role="status" aria-live="polite">در حال اتصال امن به پنل…</div>
+    <div class="workspace-toolbar">
+      <div><span class="toolbar-kicker">وضعیت سامانه</span><b>مرکز مدیریت BotForge</b><small>اطلاعات هنگام درخواست یا تازه‌سازی دریافت می‌شوند.</small></div>
+      <div class="toolbar-actions"><button id="admin-refresh" class="quiet-button" type="button">↻ تازه‌سازی اطلاعات</button><button id="admin-export" class="quiet-button" type="button">↓ خروجی CSV</button></div>
+    </div>
 
     <section class="stats workspace-stats" aria-label="آمار کلی">
       <article class="stat" data-stat="users" hidden><span>اعضای ثبت‌نام‌شده</span><strong id="stat-users">—</strong><small>حساب‌های پلتفرم</small></article>
@@ -44,11 +48,13 @@
 
     <section class="panel workspace-panel" id="submissions-panel" hidden>
       <div class="panel-heading"><div><span class="eyebrow">REVIEW QUEUE</span><h2>صف بررسی سورس‌ها</h2><p class="panel-subtitle">درخواست‌ها را بررسی کن و نتیجه را برای صاحب پروژه ثبت کن.</p></div><span class="panel-mark">01</span></div>
+      <div class="list-tools"><input class="list-search" type="search" placeholder="جست‌وجوی نام پروژه، کاربر یا توضیحات…" data-filter-target="#queue" aria-label="جست‌وجوی درخواست‌ها"><select data-filter-status="#queue" aria-label="فیلتر وضعیت"><option value="">همه وضعیت‌ها</option><option value="pending">در انتظار بررسی</option><option value="approved">تأییدشده</option><option value="rejected">ردشده</option></select></div>
       <div id="queue" class="data-list"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>
     </section>
 
     <section class="panel workspace-panel" id="users-panel" hidden>
       <div class="panel-heading"><div><span class="eyebrow">MEMBERS</span><h2>مدیریت اعضا</h2><p class="panel-subtitle">وضعیت حساب‌ها و سطح نقش اعضا را مدیریت کن.</p></div><span class="panel-mark">02</span></div>
+      <div class="list-tools"><input class="list-search" type="search" placeholder="جست‌وجوی نام کاربری…" data-filter-target="#users-list" aria-label="جست‌وجوی کاربران"><select data-filter-status="#users-list" aria-label="فیلتر نقش"><option value="">همه نقش‌ها</option><option value="user">عضو</option><option value="admin">مدیر</option><option value="owner">مالک</option></select></div>
       <div id="users-list" class="data-list"><div class="skeleton-row"></div></div>
     </section>
 
@@ -74,11 +80,13 @@
 
     <section class="panel workspace-panel" id="bots-panel" hidden>
       <div class="panel-heading"><div><span class="eyebrow">PUBLIC LIBRARY</span><h2>کتابخانه منتشرشده</h2><p class="panel-subtitle">سورس‌های فعال و آرشیوشده را مدیریت کن.</p></div><span class="panel-mark">03</span></div>
+      <div class="list-tools"><input class="list-search" type="search" placeholder="جست‌وجوی سورس و دسته‌بندی…" data-filter-target="#bots-list" aria-label="جست‌وجوی کتابخانه"><select data-filter-status="#bots-list" aria-label="فیلتر وضعیت"><option value="">همه وضعیت‌ها</option><option value="published">منتشرشده</option><option value="archived">آرشیوشده</option></select></div>
       <div id="bots-list" class="data-list"><div class="skeleton-row"></div></div>
     </section>
 
     <section class="panel workspace-panel" id="audit-panel" hidden>
       <div class="panel-heading"><div><span class="eyebrow">ACTIVITY LOG</span><h2>گزارش فعالیت‌ها</h2><p class="panel-subtitle">رویدادهای مدیریتی و دانلودها به‌ترتیب زمان.</p></div><span class="panel-mark">04</span></div>
+      <div class="list-tools"><input class="list-search" type="search" placeholder="جست‌وجوی رویداد، مدیر یا شناسه…" data-filter-target="#audit" aria-label="جست‌وجوی گزارش‌ها"></div>
       <div id="audit" class="data-list"><div class="skeleton-row"></div></div>
     </section>
     <section id="no-permissions" class="panel no-permissions" hidden><div class="empty-emblem">◇</div><h2>دسترسی مدیریتی فعالی نداری</h2><p>برای فعال شدن بخش‌های پنل، با مالک اصلی BotForge هماهنگ کن.</p></section>
@@ -141,16 +149,16 @@
     const data = await api("/api/admin/submissions");
     $("#queue").innerHTML = data.items.length ? data.items.map(item => {
       const pending = item.status === "pending";
-      return '<article class="data-row submission-row"><div class="row-main"><span class="row-icon">⌘</span><div class="row-copy"><b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.category) + ' · ' + escapeHtml(item.uploader_username) + ' · ' + number((item.file_size / 1024).toFixed(1)) + ' KB</small><p>' + escapeHtml(item.description) + '</p><small>' + escapeHtml(item.original_filename) + ' · ' + date(item.created_at) + '</small></div></div>' + (pending ? '<div class="row-actions"><button class="action-button approve" data-review="approve" data-id="' + escapeHtml(item.id) + '">تأیید و انتشار</button><button class="action-button reject" data-review="reject" data-id="' + escapeHtml(item.id) + '">رد درخواست</button></div>' : '<span class="status-chip">' + (item.status === "approved" ? "منتشر شده" : "رد شده") + '</span>') + '</article>';
+      return '<article class="data-row submission-row" data-filter-status="' + escapeHtml(item.status) + '"><div class="row-main"><span class="row-icon">⌘</span><div class="row-copy"><b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.category) + ' · ' + escapeHtml(item.uploader_username) + ' · ' + number((item.file_size / 1024).toFixed(1)) + ' KB</small><p>' + escapeHtml(item.description) + '</p><small>' + escapeHtml(item.original_filename) + ' · ' + date(item.created_at) + '</small></div></div>' + (pending ? '<div class="row-actions"><button class="action-button approve" data-review="approve" data-id="' + escapeHtml(item.id) + '">تأیید و انتشار</button><button class="action-button reject" data-review="reject" data-id="' + escapeHtml(item.id) + '">رد درخواست</button></div>' : '<span class="status-chip">' + (item.status === "approved" ? "منتشر شده" : "رد شده") + '</span>') + '</article>';
     }).join("") : '<div class="empty-state"><span>✧</span><b>صف بررسی خالی است</b><small>در حال حاضر درخواست جدیدی وجود ندارد.</small></div>';
   }
   async function loadUsers() {
     const data = await api("/api/admin/users");
-    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.username) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" && me.user.role !== "owner" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
+    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row" data-filter-status="' + escapeHtml(user.role) + '"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.username) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" && me.user.role !== "owner" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
   }
   async function loadBots() {
     const data = await api("/api/admin/bots");
-    $("#bots-list").innerHTML = data.items.length ? data.items.map(bot => '<article class="data-row"><div class="row-main"><span class="row-icon">▣</span><div class="row-copy"><b>' + escapeHtml(bot.title) + '</b><small>' + escapeHtml(bot.category) + ' · ' + number((bot.file_size / 1024).toFixed(1)) + ' KB · ' + date(bot.published_at, false) + '</small></div></div><div class="row-actions">' + (bot.status === "published" ? '<a class="action-link" href="/api/bots/' + encodeURIComponent(bot.slug) + '/download">دریافت ZIP ↗</a><button class="action-button reject" data-bot-archive data-id="' + escapeHtml(bot.id) + '">بایگانی</button>' : '<span class="status-chip">آرشیو شده</span>') + '</div></article>').join("") : '<div class="empty-state"><span>▣</span><b>کتابخانه هنوز خالی است</b></div>';
+    $("#bots-list").innerHTML = data.items.length ? data.items.map(bot => '<article class="data-row" data-filter-status="' + escapeHtml(bot.status) + '"><div class="row-main"><span class="row-icon">▣</span><div class="row-copy"><b>' + escapeHtml(bot.title) + '</b><small>' + escapeHtml(bot.category) + ' · ' + number((bot.file_size / 1024).toFixed(1)) + ' KB · ' + date(bot.published_at, false) + '</small></div></div><div class="row-actions">' + (bot.status === "published" ? '<a class="action-link" href="/api/bots/' + encodeURIComponent(bot.slug) + '/download">دریافت ZIP ↗</a><button class="action-button reject" data-bot-archive data-id="' + escapeHtml(bot.id) + '">بایگانی</button>' : '<span class="status-chip">آرشیو شده</span>') + '</div></article>').join("") : '<div class="empty-state"><span>▣</span><b>کتابخانه هنوز خالی است</b></div>';
   }
   async function loadAudit() {
     const data = await api("/api/admin/audit");
@@ -209,15 +217,16 @@
 
   $("#manager-form").addEventListener("submit", async event => {
     event.preventDefault();
+    const form = event.currentTarget;
     const button = event.submitter;
-    const permissions = $$('input[name="permission"]:checked').map(input => input.value);
+    const permissions = $('input[name="permission"]:checked').map(input => input.value);
     if (!permissions.length) { $("#manager-message").textContent = "حداقل یک دسترسی انتخاب کن."; return; }
     button.disabled = true;
     $("#manager-message").textContent = "در حال ایجاد حساب مدیر…";
     try {
       const created = await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ username:$("#manager-username").value.trim(), password:$("#manager-password").value, permissions }) });
       $("#manager-message").textContent = "مدیر ساخته شد؛ شناسه ۴ رقمی: " + (created.public_id || "—") + " — این شناسه را همراه نام کاربری و رمز به او بده.";
-      event.currentTarget.reset();
+      form.reset();
       await loadManagers();
     } catch (error) { $("#manager-message").textContent = error.message; }
     finally { button.disabled = false; }
@@ -279,6 +288,37 @@
     } catch (error) { message(error.message, "error"); button.disabled = false; }
   });
 
+  function applyListFilter(control) {
+    const section = control.closest(".workspace-panel");
+    const targetSelector = control.dataset.filterTarget || control.dataset.filterStatus;
+    const target = targetSelector ? $(targetSelector) : null;
+    if (!target || !section) return;
+    const searchInput = $('[data-filter-target]', section);
+    const statusInput = $('[data-filter-status]', section);
+    const term = (searchInput?.value || "").trim().toLocaleLowerCase("fa");
+    const status = statusInput?.value || "";
+    $(".data-row", target).forEach(row => {
+      row.hidden = !!((term && !row.textContent.toLocaleLowerCase("fa").includes(term)) || (status && row.dataset.filterStatus !== status));
+    });
+  }
+  document.addEventListener("input", event => { if (event.target.matches("[data-filter-target]")) applyListFilter(event.target); });
+  document.addEventListener("change", event => { if (event.target.matches("[data-filter-status]")) applyListFilter(event.target); });
+  $("#admin-refresh").addEventListener("click", async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = "در حال تازه‌سازی…";
+    try { await load(); } finally { button.disabled = false; button.textContent = "↻ تازه‌سازی اطلاعات"; }
+  });
+  $("#admin-export").addEventListener("click", () => {
+    const rows = [["بخش","اطلاعات"]];
+    document.querySelectorAll(".admin .workspace-panel:not([hidden])").forEach(panel => {
+      const heading = $("h2", panel)?.textContent || "گزارش";
+      $(".data-row:not([hidden])", panel).forEach(row => rows.push([heading,row.innerText.replace(/\s+/g," ").trim()]));
+    });
+    if (rows.length === 1) { message("اطلاعاتی برای خروجی گرفتن وجود ندارد.","warning"); return; }
+    const csv = "\uFEFF" + rows.map(row => row.map(value => '"' + String(value).replace(/"/g,'""') + '"').join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    const link = document.createElement("a"); link.href=url; link.download="fxi-botforge-report.csv"; link.click(); URL.revokeObjectURL(url);
+    message("گزارش CSV آماده شد.","success");
+  });
   $("#logout").addEventListener("click", async () => {
     const button = $("#logout");
     button.disabled = true;
