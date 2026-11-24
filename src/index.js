@@ -232,6 +232,14 @@ async function handleApi(request, env, url) {
     return json({ items: results || [] });
   }
 
+  if (path === "/api/notifications/read-all" && method === "POST") {
+    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL").bind(now(), auth.user.id).run();
+    return json({ ok: true });
+  }
+
   const markRead = path.match(/^\/api\/notifications\/([0-9a-f-]+)\/read$/i);
   if (markRead && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
