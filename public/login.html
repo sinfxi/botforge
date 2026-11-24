@@ -152,7 +152,7 @@
   });
 
   fetch("/api/me", { credentials: "same-origin", cache: "no-store" })
-    .then((response) => { if (response.ok) location.replace("/dashboard.html"); })
+    .then(async (response) => { if (response.ok) { const data = await response.json(); location.replace(["owner","admin"].includes(data.user?.role) ? "/admin.html" : "/dashboard.html"); } })
     .catch(() => {});
 })();
 </script>
