@@ -391,6 +391,41 @@ async function handleApi(request, env, url) {
       await audit(env, admin.user.id, "user." + status, "user", target.id, { username: target.username });
       return json({ ok: true, status });
     }
+    if (path === "/api/admin/bots/publish" && method === "POST") {
+      if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+      if (!env.FILES) return json({ error: "فضای ذخیره‌سازی فایل پیکربندی نشده است." }, 503);
+      const form = await request.formData().catch(() => null);
+      if (!form) return json({ error: "فرم ارسال‌شده قابل خواندن نیست." }, 400);
+      const title = safeText(form.get("title"), 90);
+      const description = safeText(form.get("description"), 1200);
+      const category = safeText(form.get("category"), 40);
+      const rights = form.get("rights") === "on";
+      const file = form.get("file");
+      if (title.length < 3 || description.length < 10 || !category || !rights || !(file instanceof File)) {
+        return json({ error: "نام پروژه، توضیحات، دسته‌بندی، فایل و تأیید حق انتشار الزامی است." }, 400);
+      }
+      if (!file.name.toLowerCase().endsWith(".zip") || file.size < 4 || file.size > (Number(env.MAX_UPLOAD_BYTES) || MAX_UPLOAD)) {
+        return json({ error: "فقط فایل ZIP با حجم حداکثر ۵ مگابایت پذیرفته می‌شود." }, 400);
+      }
+      const bytes = await file.arrayBuffer();
+      const head = new Uint8Array(bytes.slice(0, 4));
+      if (!(head[0] === 0x50 && head[1] === 0x4b && [0x03,0x05,0x07].includes(head[2]) && [0x04,0x06,0x08].includes(head[3]))) {
+        return json({ error: "ساختار فایل ZIP معتبر نیست." }, 400);
+      }
+      const botId = id();
+      const slug = `${slugify(title)}-${botId.slice(0,8)}`;
+      const objectKey = `published/${slug}.zip`;
+      await env.FILES.put(objectKey, bytes);
+      try {
+        await env.DB.prepare("INSERT INTO bots (id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES (?,?,?,?,?,?,?,?,?)")
+          .bind(botId, slug, title, description, category, objectKey, safeFilename(file.name) || "source.zip", file.size, admin.user.id).run();
+      } catch (error) {
+        await env.FILES.delete(objectKey);
+        throw error;
+      }
+      await audit(env, admin.user.id, "bot.publish.direct", "bot", botId, { title, category, file_size: file.size });
+      return json({ ok: true, id: botId, slug, message: "پروژه مستقیماً منتشر شد." }, 201);
+    }
     if (path === "/api/admin/bots" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT id,slug,title,category,file_size,status,published_at FROM bots ORDER BY published_at DESC LIMIT 200").all();
       return json({ items: results || [] });
