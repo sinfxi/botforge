@@ -248,7 +248,7 @@ async function handleApi(request, env, url) {
       }
       if (managerRoute && managerRoute[1] && managerRoute[2] === "remove" && method === "POST") {
         if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
-        const target=await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
+        const target=await env.DB.prepare("SELECT id,username FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
         if (!target) return json({error:"مدیر پیدا نشد."},404);
         await env.DB.prepare("UPDATE users SET role='user',permissions_json=NULL,updated_at=? WHERE id=? AND role='admin'").bind(now(),target.id).run();
         await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
