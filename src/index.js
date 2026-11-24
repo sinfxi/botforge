@@ -104,10 +104,17 @@ async function handleApi(request, env, url) {
     if (existing) return json({ error: "حساب مدیر قبلاً ساخته شده است." }, 409);
     const body = await request.json().catch(() => null), username = safeText(body?.username, 24).toLowerCase(), password = typeof body?.password === "string" ? body.password : "";
     if (!/^[a-z0-9_]{3,24}$/.test(username) || username !== configuredUsername || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "نام کاربری یا رمز راه‌اندازی صحیح نیست." }, 401);
-    const salt = id(), userId = id(), publicId = await createPublicId(env);
-    await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?, 'owner')").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
-    await audit(env, userId, "owner.bootstrap", "user", userId);
-    return json({ ok: true, user_id: publicId, message: "حساب مالک ساخته شد؛ شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
+    const requestId = id();
+    try {
+      const salt = id(), userId = id(), publicId = await createPublicId(env);
+      await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?, 'owner')").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
+      await audit(env, userId, "owner.bootstrap", "user", userId);
+      return json({ ok: true, user_id: publicId, message: "حساب مالک ساخته شد؛ شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
+    } catch (error) {
+      console.error("Owner bootstrap failed:", requestId, error);
+      const diagnostic = String(error?.message || error).replace(/[\\r\\n\\t]/g, " ").slice(0, 180);
+      return json({ error: "ساخت حساب مالک ناموفق بود.", request_id: requestId, diagnostic }, 500);
+    }
   }
   if (path === "/api/auth/register" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
