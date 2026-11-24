@@ -95,7 +95,7 @@ async function handleApi(request, env, url) {
   if (path === "/api/health" && method === "GET") {
     try {
       await env.DB.prepare("SELECT 1").first();
-      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing", authentication: "user_id + password" });
+      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing", authentication: "user_id + password", edge: request.cf?.colo || null, checked_at: now() });
     } catch (error) {
       console.error("Health check failed:", error);
       return json({ ok: false, database: "unavailable", error: "اتصال پایگاه داده برقرار نیست." }, 503);
@@ -475,6 +475,9 @@ async function handleApi(request, env, url) {
   return json({ error: "مسیر API پیدا نشد." }, 404);
 }
 
+const STATIC_ASSET_CACHE = new Map();
+let STATIC_KV_COOLDOWN_UNTIL = 0;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -487,24 +490,58 @@ export default {
     if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
 
-    // KV is the release source for public pages. Read it first so the UI cannot
-    // silently fall back to an older static-assets bundle after a Worker-only deploy.
-    if (env.FILES) {
-      const asset = await env.FILES.get("static" + assetPath, "text");
-      if (asset !== null) {
-        const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
-        const cacheControl = assetPath.endsWith(".html") ? "no-store" : "public, max-age=300, stale-while-revalidate=3600";
-        return new Response(request.method === "HEAD" ? null : asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
+    const cached = STATIC_ASSET_CACHE.get(assetPath);
+    let asset = cached && cached.expiresAt > Date.now() ? cached.body : null;
+    let source = cached && cached.expiresAt > Date.now() ? cached.source : "";
+
+    // KV is the latest release source, but it must never hold the page open indefinitely.
+    // Cache successful reads per isolate and temporarily bypass KV after a slow/failing read.
+    if (asset === null && env.FILES && Date.now() >= STATIC_KV_COOLDOWN_UNTIL) {
+      try {
+        const read = env.FILES.get("static" + assetPath, "text");
+        asset = await Promise.race([
+          read,
+          new Promise(resolve => setTimeout(() => resolve(null), 1200))
+        ]);
+        if (asset !== null) {
+          source = "kv";
+          STATIC_KV_COOLDOWN_UNTIL = 0;
+          STATIC_ASSET_CACHE.set(assetPath, { body: asset, source, expiresAt: Date.now() + 15000 });
+        } else {
+          STATIC_KV_COOLDOWN_UNTIL = Date.now() + 10000;
+        }
+      } catch (error) {
+        console.error("Static KV read failed:", assetPath, error);
+        STATIC_KV_COOLDOWN_UNTIL = Date.now() + 10000;
+        asset = null;
       }
     }
 
-    if (env.ASSETS?.fetch) {
-      const assetUrl = new URL(request.url);
-      assetUrl.pathname = assetPath;
-      assetUrl.search = "";
-      const assetResponse = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method, headers: request.headers }));
-      if (assetResponse.status !== 404) return assetResponse;
+    if (asset === null && env.ASSETS?.fetch) {
+      try {
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = assetPath;
+        assetUrl.search = "";
+        const assetResponse = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method, headers: request.headers }));
+        if (assetResponse.status !== 404) {
+          const headers = new Headers(assetResponse.headers);
+          headers.set("x-fxi-static-source", "assets");
+          headers.set("x-content-type-options", "nosniff");
+          return assetResponse.body
+            ? new Response(request.method === "HEAD" ? null : assetResponse.body, { status: assetResponse.status, statusText: assetResponse.statusText, headers })
+            : assetResponse;
+        }
+      } catch (error) {
+        console.error("Static asset fallback failed:", assetPath, error);
+      }
     }
-    return new Response("Not Found", { status: 404 });
+
+    if (asset !== null) {
+      if (STATIC_ASSET_CACHE.size > 12) STATIC_ASSET_CACHE.clear();
+      const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
+      const cacheControl = assetPath.endsWith(".html") ? "no-store" : "public, max-age=300, stale-while-revalidate=3600";
+      return new Response(request.method === "HEAD" ? null : asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-fxi-static-source": source || "memory", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
+    }
+    return new Response("Static asset temporarily unavailable", { status: 503, headers: { "cache-control": "no-store", "retry-after": "5", "content-type": "text/plain; charset=utf-8" } });
   }
 };
