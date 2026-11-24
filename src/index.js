@@ -114,11 +114,11 @@ async function handleApi(request, env, url) {
   if (path === "/api/auth/login" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "نام کاربری و رمز عبور را کامل وارد کن." }, 400);
-    const username = body.username.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "نام کاربری یا رمز عبور معتبر نیست." }, 400);
-    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE username = ?").bind(username).first();
-    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "نام کاربری یا رمز عبور اشتباه است." }, 401);
+    if (!body || typeof body.user_id !== "string" || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری، نام کاربری و رمز عبور را کامل وارد کن." }, 400);
+    const userId = safeText(body.user_id, 36).toLowerCase(), username = body.username.trim().toLowerCase();
+    if (!/^[0-9a-f-]{36}$/.test(userId) || !/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "شناسه یا نام کاربری معتبر نیست." }, 400);
+    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE id = ? AND username = ?").bind(userId, username).first();
+    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "شناسه کاربری، نام کاربری یا رمز عبور اشتباه است." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
     await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)").bind(id(), user.id, await sha256(token), new Date(Date.now() + days * 86400000).toISOString()).run();
