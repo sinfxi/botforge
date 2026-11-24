@@ -8,7 +8,7 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - Password hashing with PBKDF2, hashed opaque sessions, HttpOnly/Secure/SameSite cookies, and server-side role checks.
 - D1 schema and first migration.
 - Cloudflare KV-backed private ZIP submissions (5 MiB limit; KV is eventually consistent and intended for small/medium ZIP files), pending review, approve/reject workflow, published download endpoint, user notifications, and audit log.
-- Owner bootstrap protected by deployment-only secrets.
+- One-time owner setup: the first visitor to submit a chosen 4-digit ID and password becomes the sole owner; the database enforces the single-owner rule.
 
 ## Stack
 - Cloudflare Workers + Static Assets
@@ -21,20 +21,15 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 2. Create a D1 database and a Workers KV namespace in your Cloudflare account.
 3. Update the D1 `database_id` and KV namespace `id` in `wrangler.toml`.
 4. Apply the migration: `npx wrangler d1 migrations apply fxi-botforge-db --local`.
-5. Create a local `.dev.vars` file (never commit it):
-   ```
-   BOOTSTRAP_OWNER_USERNAME=adminfxi
-   BOOTSTRAP_OWNER_PASSWORD=your-owner-password
-   ```
-6. Start the app: `npx wrangler dev`.
+5. Start the app: `npx wrangler dev`. The first person to submit the owner setup form chooses the 4-digit ID and password.
 
 ## Cloudflare setup
 1. Create a D1 database named `fxi-botforge-db` and a Workers KV namespace named `fxi-botforge-files`.
 2. Confirm the D1 database ID and KV namespace ID in `wrangler.toml` match your Cloudflare account.
 3. Run `npx wrangler d1 migrations apply fxi-botforge-db --remote`.
-4. Add Worker secrets `BOOTSTRAP_OWNER_USERNAME` and `BOOTSTRAP_OWNER_PASSWORD` in Worker Settings → Variables and Secrets. Do not put secrets in GitHub.
-5. Deploy the Worker with `npx wrangler deploy` (or connect the repository through Workers Builds).
-6. Open `/setup-owner.html` once, create the owner account using the exact username/password configured as secrets, then sign in at `/login.html` using the generated 4-digit public user ID, username, and password. The bootstrap endpoint permanently closes after an owner/admin exists.
+4. Deploy the Worker with `npx wrangler deploy` (or connect the repository through Workers Builds).
+5. Open `/setup-owner.html` before anyone else. Enter a 4-digit ID of your choice and any password (1–200 characters). The first successful submission becomes the sole owner; later setup attempts are rejected and the setup form closes.
+6. Sign in at `/login.html` using only the chosen 4-digit ID and password. The login form also accepts Persian or Arabic numerals.
 7. Check `/api/health`; it should report database connected and storage configured.
 
 ## Routes
