@@ -19,6 +19,10 @@
       <p id="subheading">وارد حساب شو تا پروژه‌ها و درخواست‌هایت را در یک جا مدیریت کنی.</p>
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
       <form id="auth-form" novalidate>
+        <div class="field" id="user-id-field">
+          <label for="user-id">شناسه کاربری</label>
+          <input id="user-id" type="text" inputmode="text" autocomplete="off" placeholder="شناسه ۳۶ کاراکتری حساب" maxlength="36">
+        </div>
         <div class="field">
           <label for="username">نام کاربری</label>
           <input id="username" type="text" autocomplete="username" placeholder="مثلاً fxi_user" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+">
@@ -39,6 +43,7 @@
   const notice = $("#notice");
   const button = $("#submit");
   const username = $("#username");
+  const userId = $("#user-id");
   const password = $("#password");
   let registerMode = false;
   let busy = false;
@@ -75,6 +80,8 @@
     $("#switch-label").textContent = registerMode ? "قبلاً حساب داری؟" : "حساب کاربری نداری؟";
     $("#switch").textContent = registerMode ? "وارد شو" : "ثبت‌نام کن";
     password.autocomplete = registerMode ? "new-password" : "current-password";
+    $("#user-id-field").hidden = registerMode;
+    userId.required = !registerMode;
     password.placeholder = registerMode ? "حداقل ۱۰ کاراکتر" : "رمز عبور حساب";
     clearNotice();
   }
@@ -87,6 +94,11 @@
     if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
       showNotice("نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد.", "error");
       username.focus();
+      return;
+    }
+    if (!registerMode && !/^[0-9a-f-]{36}$/i.test(userId.value.trim())) {
+      showNotice("شناسه کاربری معتبر ۳۶ کاراکتری را وارد کن.", "error");
+      userId.focus();
       return;
     }
     if (password.value.length < 10 || password.value.length > 200) {
@@ -104,7 +116,7 @@
         credentials: "same-origin",
         cache: "no-store",
         headers: { "content-type": "application/json", "accept": "application/json" },
-        body: JSON.stringify({ username: normalizedUsername, password: password.value })
+        body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), username: normalizedUsername, password: password.value })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `درخواست ناموفق بود (کد ${response.status}).`);
@@ -112,7 +124,8 @@
         setMode(false);
         username.value = normalizedUsername;
         password.value = "";
-        showNotice("حساب با موفقیت ساخته شد؛ حالا با همین نام کاربری وارد شو.", "success");
+        userId.value = data.user_id || "";
+        showNotice("حساب ساخته شد. شناسه کاربری تو: " + (data.user_id || "—") + " — این شناسه را نگه دار و برای ورود همراه نام کاربری و رمز استفاده کن.", "success");
         password.focus();
       } else {
         location.replace("/dashboard.html");
