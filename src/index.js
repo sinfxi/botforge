@@ -89,11 +89,16 @@ async function handleApi(request, env, url) {
   if (path === "/api/health" && method === "GET") {
     try {
       await env.DB.prepare("SELECT 1").first();
-      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing", authentication: "user_id + username + password" });
+      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing", authentication: "user_id + password" });
     } catch (error) {
       console.error("Health check failed:", error);
       return json({ ok: false, database: "unavailable", error: "اتصال پایگاه داده برقرار نیست." }, 503);
     }
+  }
+
+  if (path === "/api/auth/bootstrap/status" && method === "GET") {
+    const existing = await env.DB.prepare("SELECT id FROM users WHERE role IN ('owner','admin') LIMIT 1").first();
+    return json({ available: !existing });
   }
 
   if (path === "/api/auth/bootstrap" && method === "POST") {
