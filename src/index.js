@@ -47,7 +47,7 @@ async function currentUser(request, env) {
   const token = readCookie(request, "fxi_session");
   if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT users.id, users.username, users.role, users.status, users.permissions_json FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
+    "SELECT users.id, users.public_id, users.username, users.role, users.status, users.permissions_json FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
   ).bind(await sha256(token), now()).first();
   return row && row.status === "active" ? row : null;
 }
@@ -107,8 +107,10 @@ async function handleApi(request, env, url) {
     const requestId = id();
     try {
       const salt = id(), userId = id(), publicId = await createPublicId(env);
-      await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?, 'owner')").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
-      await audit(env, userId, "owner.bootstrap", "user", userId);
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?, 'owner')").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt),
+        env.DB.prepare("INSERT INTO audit_logs (id,actor_id,action,target_type,target_id,details_json) VALUES (?,?,?,?,?,?)").bind(id(), userId, "owner.bootstrap", "user", userId, null)
+      ]);
       return json({ ok: true, user_id: publicId, message: "حساب مالک ساخته شد؛ شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
     } catch (error) {
       console.error("Owner bootstrap failed:", requestId, error);
@@ -122,8 +124,9 @@ async function handleApi(request, env, url) {
     if (!body || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "نام کاربری و رمز عبور را کامل وارد کن." }, 400);
     const username = body.username.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,24}$/.test(username) || body.password.length < 10 || body.password.length > 200) return json({ error: "نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد؛ رمز حداقل ۱۰ کاراکتر باشد." }, 400);
-    const salt = id(), userId = id(), publicId = await createPublicId(env);
+    const salt = id(), userId = id();
     try {
+      const publicId = await createPublicId(env);
       await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?,?)").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(body.password, salt), salt).run();
       return json({ ok: true, user_id: publicId, username, message: "حساب ساخته شد. شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
     } catch (error) {
@@ -234,7 +237,7 @@ async function handleApi(request, env, url) {
     if (path === "/api/admin/managers" || managerRoute) {
       if (admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند مدیران را مدیریت کند." }, 403);
       if (path === "/api/admin/managers" && method === "GET") {
-        const { results } = await env.DB.prepare("SELECT id,username,status,permissions_json,created_at FROM users WHERE role='admin' ORDER BY created_at DESC").all();
+        const { results } = await env.DB.prepare("SELECT id,public_id,username,status,permissions_json,created_at FROM users WHERE role='admin' ORDER BY created_at DESC").all();
         return json({ items: (results || []).map(u => ({...u, permissions: safePermissions(u.permissions_json)})) });
       }
       if (path === "/api/admin/managers" && method === "POST") {
@@ -246,15 +249,17 @@ async function handleApi(request, env, url) {
         const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
         if (!/^[a-z0-9_]{3,24}$/.test(username) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "نام کاربری معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
         const salt = id(), managerId = id();
+        let publicId;
         try {
-          await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?,?,?,?)").bind(managerId,username + "@accounts.botforge.invalid",username,await passwordHash(password,salt),salt,"admin",JSON.stringify(permissions)).run();
+          publicId = await createPublicId(env);
+          await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?,?,?,?,?)").bind(managerId,publicId,username + "@accounts.botforge.invalid",username,await passwordHash(password,salt),salt,"admin",JSON.stringify(permissions)).run();
         } catch (error) {
           console.error("Manager creation failed:", error);
           if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این نام کاربری قبلاً در BotForge ثبت شده است." }, 409);
           return json({ error: "ساخت حساب مدیر در پایگاه داده ناموفق بود. دوباره تلاش کن." }, 500);
         }
         await audit(env,admin.user.id,"manager.create","user",managerId,{username,permissions});
-        return json({ok:true,id:managerId,username},201);
+        return json({ok:true,id:managerId,public_id:publicId,username},201);
       }
       if (managerRoute && managerRoute[1] && managerRoute[2] === "permissions" && method === "POST") {
         if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
@@ -339,7 +344,7 @@ async function handleApi(request, env, url) {
       return json({ ok: true, slug });
     }
     if (path === "/api/admin/users" && method === "GET") {
-      const { results } = await env.DB.prepare("SELECT id,username,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
+      const { results } = await env.DB.prepare("SELECT id,public_id,username,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
       return json({ items: results || [] });
     }
     const userStatus = path.match(/^\/api\/admin\/users\/([0-9a-f-]+)\/(suspend|activate)$/i);
