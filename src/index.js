@@ -79,8 +79,11 @@ async function handleApi(request, env, url) {
   if (path === "/api/health" && method === "GET") {
     try {
       await env.DB.prepare("SELECT 1").first();
-      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing" });
-    } catch { return json({ ok: false, database: "unavailable" }, 503); }
+      return json({ ok: true, service: "FXI BotForge", database: "connected", storage: env.FILES ? "KV configured" : "missing", authentication: "user_id + username + password" });
+    } catch (error) {
+      console.error("Health check failed:", error);
+      return json({ ok: false, database: "unavailable", error: "اتصال پایگاه داده برقرار نیست." }, 503);
+    }
   }
 
   if (path === "/api/auth/bootstrap" && method === "POST") {
