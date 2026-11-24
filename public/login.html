@@ -97,7 +97,7 @@
       return;
     }
     if (!registerMode && !/^[0-9a-f-]{36}$/i.test(userId.value.trim())) {
-      showNotice("شناسه کاربری معتبر ۳۶ کاراکتری را وارد کن.", "error");
+      showNotice("شناسه کاربری باید دقیقاً ۴ رقم باشد.", "error");
       userId.focus();
       return;
     }
