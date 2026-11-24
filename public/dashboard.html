@@ -203,6 +203,17 @@
     catch (error) { button.disabled = false; showMessage("#page-message", error.message, "error"); }
   });
   init();
+  // Keep personal requests and notifications fresh without a manual reload.
+  setInterval(() => {
+    if (!document.hidden && currentUser) {
+      Promise.allSettled([loadSubmissions(), loadNotifications()]);
+    }
+  }, 30000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && currentUser) {
+      Promise.allSettled([loadSubmissions(), loadNotifications()]);
+    }
+  });
 })();
 </script>
 </body>
