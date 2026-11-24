@@ -83,3 +83,5 @@ CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status, created
 CREATE INDEX IF NOT EXISTS idx_submissions_user ON submissions(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_owner ON users(role) WHERE role = 'owner';
