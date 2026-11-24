@@ -139,7 +139,7 @@
         showNotice("حساب ساخته شد. شناسه کاربری: " + (data.user_id || "—") + " — این شناسه را همراه نام کاربری و رمز عبورت برای ورود نگه دار.", "success");
         password.focus();
       } else {
-        location.replace("/dashboard.html");
+        location.replace(data.role === "owner" || data.role === "admin" ? "/admin.html" : "/dashboard.html");
       }
     } catch (error) {
       showNotice(error instanceof TypeError ? await diagnoseConnection() : error.message, "error");
