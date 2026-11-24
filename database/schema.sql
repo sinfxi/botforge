@@ -4,9 +4,11 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   public_id TEXT UNIQUE,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  username TEXT UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin','owner')),
+  permissions_json TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -72,6 +74,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users(public_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_bots_published ON bots(status, published_at DESC);
