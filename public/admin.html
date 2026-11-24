@@ -139,7 +139,7 @@
   }
   async function loadUsers() {
     const data = await api("/api/admin/users");
-    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.email) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
+    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.email) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" && me.user.role !== "owner" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
   }
   async function loadBots() {
     const data = await api("/api/admin/bots");
@@ -182,6 +182,7 @@
       setStat("pending", overview.pending);
       setStat("submissions", overview.submissions);
       setStat("downloads", overview.downloads);
+      $(".workspace-stats").hidden = !$(".stat:not([hidden])", $(".workspace-stats")).length;
       const tasks = [];
       if (permissions.includes("submissions")) tasks.push(loadSubmissions());
       if (permissions.includes("users")) tasks.push(loadUsers());
