@@ -196,12 +196,12 @@
     $("#manager-list").innerHTML = data.items.length ? data.items.map(manager => '<details class="manager-card"><summary><span class="manager-avatar">M</span><span class="manager-summary"><b>' + escapeHtml(manager.username) + '</b><small>شناسه ورود: ' + escapeHtml(manager.public_id || "—") + ' · ' + (manager.status === "active" ? "حساب فعال" : "حساب تعلیق‌شده") + ' · ' + date(manager.created_at, false) + '</small></span><span class="manager-chevron">⌄</span></summary><div class="manager-edit-body"><p>دسترسی‌های مجاز این مدیر:</p><div class="permission-grid compact">' + permissionKeys.map(key => '<label><input type="checkbox" data-manager-permission="' + key + '"' + (manager.permissions.includes(key) ? ' checked' : '') + '><span><b>' + labels[key] + '</b></span></label>').join("") + '</div><div class="row-actions"><button class="action-button approve" data-manager-save data-id="' + escapeHtml(manager.id) + '">ذخیره دسترسی‌ها</button><button class="action-button reject" data-manager-remove data-id="' + escapeHtml(manager.id) + '">لغو نقش مدیریت</button></div></div></details>').join("") : '<div class="empty-state"><span>＋</span><b>هنوز مدیری اضافه نشده است</b><small>از فرم بالا اولین مدیر را ایجاد کن.</small></div>';
   }
 
-  async function load() {
-    message("در حال بررسی حساب و دریافت اطلاعات پنل…");
+  async function load({ silent = false } = {}) {
+    if (!silent) message("در حال بررسی حساب و دریافت اطلاعات پنل…");
     try {
       me = await api("/api/me");
       if (!["owner", "admin"].includes(me.user.role)) {
-        message("این حساب اجازه ورود به مرکز مدیریت را ندارد.", "error");
+        if (!silent) message("این حساب اجازه ورود به مرکز مدیریت را ندارد.", "error");
         return;
       }
       const isOwner = me.user.role === "owner";
@@ -233,11 +233,11 @@
       if (isOwner) tasks.push(loadManagers());
       const results = await Promise.allSettled(tasks);
       const failures = results.filter(result => result.status === "rejected");
-      message(failures.length ? "پنل باز شد، اما بارگذاری بخشی از اطلاعات ناموفق بود. می‌توانی دوباره تلاش کنی." : "اتصال برقرار است؛ اطلاعات پنل به‌روز شد.", failures.length ? "warning" : "success");
+      if (!silent) message(failures.length ? "پنل باز شد، اما بارگذاری بخشی از اطلاعات ناموفق بود. می‌توانی دوباره تلاش کنی." : "اتصال برقرار است؛ اطلاعات پنل به‌روز شد.", failures.length ? "warning" : "success");
       if (failures.length) console.error("Admin section loading errors:", failures.map(x => x.reason));
     } catch (error) {
       if (error.status === 401) { location.replace("/login.html"); return; }
-      message(error.message || "اتصال به پنل برقرار نشد. اتصال اینترنت را بررسی کن.", "error");
+      if (!silent) message(error.message || "اتصال به پنل برقرار نشد. اتصال اینترنت را بررسی کن.", "error");
     }
   }
 
@@ -400,6 +400,13 @@
     catch (error) { message(error.message, "error"); button.disabled = false; }
   });
   load();
+  // Refresh admin data in the background while the tab is visible.
+  setInterval(() => {
+    if (!document.hidden && me) load({ silent: true });
+  }, 45000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && me) load({ silent: true });
+  });
 })();
 </script>
 </body>
