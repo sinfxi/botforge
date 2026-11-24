@@ -210,8 +210,8 @@
     button.disabled = true;
     $("#manager-message").textContent = "در حال ایجاد حساب مدیر…";
     try {
-      await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ username:$("#manager-username").value.trim(), password:$("#manager-password").value, permissions }) });
-      $("#manager-message").textContent = "حساب مدیر ساخته شد. اطلاعات ورود را امن در اختیارش قرار بده.";
+      const created = await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ username:$("#manager-username").value.trim(), password:$("#manager-password").value, permissions }) });
+      $("#manager-message").textContent = "مدیر ساخته شد؛ شناسه کاربری: " + created.id + " — این شناسه را همراه نام کاربری و رمز به او بده.";
       event.currentTarget.reset();
       await loadManagers();
     } catch (error) { $("#manager-message").textContent = error.message; }
