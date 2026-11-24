@@ -219,7 +219,7 @@ async function handleApi(request, env, url) {
         const password = typeof body?.password === "string" ? body.password : "";
         const allowed = ["submissions","users","bots","audit"];
         const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "ایمیل معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "ایمیل معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
         const salt = id(), managerId = id();
         try {
           await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?, 'admin', ?)").bind(managerId,email,await passwordHash(password,salt),salt,JSON.stringify(permissions)).run();
