@@ -131,12 +131,12 @@ async function handleApi(request, env, url) {
     if (!body || typeof body.user_id !== "string" || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری، نام کاربری و رمز عبور را کامل وارد کن." }, 400);
     const userId = safeText(body.user_id, 36).toLowerCase(), username = body.username.trim().toLowerCase();
     if (!/^\d{4}$/.test(userId) || !/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "شناسه کاربری باید دقیقاً ۴ رقم باشد." }, 400);
-    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE public_id = ? AND username = ?").bind(userId, username).first();
+    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status,role FROM users WHERE public_id = ? AND username = ?").bind(userId, username).first();
     if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "شناسه کاربری، نام کاربری یا رمز عبور اشتباه است." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
     await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)").bind(id(), user.id, await sha256(token), new Date(Date.now() + days * 86400000).toISOString()).run();
-    return json({ ok: true }, 200, { "set-cookie": cookie("fxi_session", token, days * 86400) });
+    return json({ ok: true, role: user.role }, 200, { "set-cookie": cookie("fxi_session", token, days * 86400) });
   }
 
   if (path === "/api/auth/logout" && method === "POST") {
