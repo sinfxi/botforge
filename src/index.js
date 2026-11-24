@@ -36,6 +36,12 @@ function readCookie(request, name) {
 function safeText(value, max) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
+function normalizeUserId(value) {
+  return safeText(value, 16)
+    .replace(/[۰-۹]/g, digit => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[٠-٩]/g, digit => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .slice(0, 4);
+}
 function safeFilename(value) {
   return safeText(value, 120).replace(/[^\p{L}\p{N}._ -]/gu, "_").replace(/\s+/g, "_");
 }
@@ -104,7 +110,7 @@ async function handleApi(request, env, url) {
   if (path === "/api/auth/bootstrap" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
-    const publicId = safeText(body?.user_id, 4);
+    const publicId = normalizeUserId(body?.user_id);
     const password = typeof body?.password === "string" ? body.password : "";
     if (!/^\d{4}$/.test(publicId) || password.length < 1 || password.length > 200) {
       return json({ error: "شناسه مالک باید دقیقاً ۴ رقم و رمز عبور باید بین ۱ تا ۲۰۰ کاراکتر باشد." }, 400);
@@ -152,7 +158,7 @@ async function handleApi(request, env, url) {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
     if (!body || typeof body.user_id !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری و رمز عبور را کامل وارد کن." }, 400);
-    const userId = safeText(body.user_id, 4);
+    const userId = normalizeUserId(body.user_id);
     const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
     if (!/^\d{4}$/.test(userId) || (username && !/^[a-z0-9_]{3,24}$/.test(username)) || body.password.length > 200) return json({ error: "شناسه کاربری باید دقیقاً ۴ رقم باشد." }, 400);
     const user = username
