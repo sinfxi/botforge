@@ -397,8 +397,17 @@ export default {
     if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
 
-    // Prefer the versioned static bundle published with the Worker. KV remains a
-    // backwards-compatible fallback for deployments that have no asset manifest.
+    // KV is the release source for public pages. Read it first so the UI cannot
+    // silently fall back to an older static-assets bundle after a Worker-only deploy.
+    if (env.FILES) {
+      const asset = await env.FILES.get("static" + assetPath, "text");
+      if (asset !== null) {
+        const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
+        const cacheControl = assetPath.endsWith(".html") ? "no-store" : "public, max-age=300, stale-while-revalidate=3600";
+        return new Response(request.method === "HEAD" ? null : asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
+      }
+    }
+
     if (env.ASSETS?.fetch) {
       const assetUrl = new URL(request.url);
       assetUrl.pathname = assetPath;
@@ -406,12 +415,6 @@ export default {
       const assetResponse = await env.ASSETS.fetch(new Request(assetUrl, { method: request.method, headers: request.headers }));
       if (assetResponse.status !== 404) return assetResponse;
     }
-
-    if (!env.FILES) return new Response("Storage unavailable", { status: 503 });
-    const asset = await env.FILES.get("static" + assetPath, "text");
-    if (asset === null) return new Response("Not Found", { status: 404 });
-    const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
-    const cacheControl = assetPath.endsWith(".html") ? "public, max-age=60, stale-while-revalidate=300" : "public, max-age=3600, stale-while-revalidate=86400";
-    return new Response(request.method === "HEAD" ? null : asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
+    return new Response("Not Found", { status: 404 });
   }
 };
