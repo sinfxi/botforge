@@ -47,6 +47,7 @@
   const password = $("#password");
   let registerMode = false;
   let busy = false;
+  userId.addEventListener("input", () => { userId.value = userId.value.replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[٠-٩]/g, d => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).slice(0, 4); });
 
   function showNotice(message, type = "success") {
     notice.textContent = message;
