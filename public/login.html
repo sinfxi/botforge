@@ -108,7 +108,7 @@
       }
     } catch (error) {
       showNotice(error instanceof TypeError
-        ? "ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کن و دوباره تلاش کن."
+        ? "ارتباط با سرویس BotForge برقرار نشد. صفحه را تازه‌سازی کن؛ اگر ادامه داشت، وضعیت /api/health را بررسی می‌کنیم."
         : error.message, "error");
     } finally {
       busy = false;
