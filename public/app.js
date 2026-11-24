@@ -49,3 +49,29 @@ async function loadBots() {
 search?.addEventListener("input", renderBots);
 category?.addEventListener("change", renderBots);
 loadBots();
+
+
+// Keep the public navigation in sync with the authenticated session.
+fetch("/api/me", { credentials: "same-origin", cache: "no-store" })
+  .then(response => response.ok ? response.json() : null)
+  .then(data => {
+    if (!data?.user) return;
+    const loginLink = document.querySelector(".topbar > .button");
+    if (loginLink) {
+      loginLink.href = "/dashboard.html";
+      loginLink.textContent = "فضای شخصی ↗";
+    }
+    const dashboardLink = document.querySelector('.hero-actions a[href="/dashboard.html"]');
+    if (dashboardLink) dashboardLink.textContent = "رفتن به فضای شخصی ↗";
+    if (["admin", "owner"].includes(data.user.role)) {
+      const nav = document.querySelector(".topbar nav");
+      if (nav && !document.querySelector('[data-admin-nav]')) {
+        const link = document.createElement("a");
+        link.href = "/admin.html";
+        link.dataset.adminNav = "true";
+        link.textContent = "مرکز مدیریت";
+        nav.append(link);
+      }
+    }
+  })
+  .catch(() => {});
