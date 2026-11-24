@@ -198,7 +198,7 @@ async function handleApi(request, env, url) {
   }
 
   if (path === "/api/bots" && method === "GET") {
-    const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
+    const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,original_filename,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
     return json({ items: results || [] }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
   }
 
