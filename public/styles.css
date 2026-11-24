@@ -203,3 +203,22 @@ footer{position:relative}.footer-brand{opacity:.9}
 .user-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:760px){.user-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:430px){.user-stats{grid-template-columns:1fr 1fr}.user-stats .stat:last-child{grid-column:1/-1}}
+
+
+/* BotForge workspace refinements: filters, quick actions and readable details */
+.workspace-toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:17px 0;padding:16px 19px;border:1px solid #e5ece2;border-radius:19px;background:linear-gradient(110deg,#fffefa,#f3f7f0);box-shadow:0 10px 28px #344c3c08}
+.workspace-toolbar>div:first-child{display:grid;gap:2px}
+.toolbar-kicker{color:#809382;font-size:9px;font-weight:800;letter-spacing:.4px}
+.workspace-toolbar b{color:#405b47;font-size:12px}
+.workspace-toolbar small{color:#96a197;font-size:9px}
+.toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.list-tools,.notification-tools{display:flex;align-items:center;gap:9px;margin:0 0 13px}
+.list-search{flex:1;min-width:160px;height:42px;padding:0 13px;border:1px solid #e5ebe2;border-radius:12px;background:#fffefa;color:#405744;font:inherit;font-size:10px;outline:none}
+.list-search:focus,.list-tools select:focus,.notification-tools select:focus{border-color:#a9c5a6;box-shadow:0 0 0 3px #dcebdc70}
+.list-tools select,.notification-tools select{height:42px;min-width:135px;padding:0 12px;border:1px solid #e5ebe2;border-radius:12px;background:#fffefa;color:#627566;font:inherit;font-size:10px;outline:none}
+.section-footnote{margin-top:12px;color:#9aa59b;font-size:9px}
+.review-date{display:block;margin-top:7px;color:#8a9a8c;font-size:9px}
+.notification-tools{justify-content:space-between;margin-bottom:14px}
+.notification-tools select{margin-inline-start:auto}
+.data-row[hidden]{display:none!important}
+@media(max-width:650px){.workspace-toolbar{align-items:flex-start;flex-direction:column}.toolbar-actions{width:100%}.toolbar-actions button{flex:1}.list-tools{align-items:stretch;flex-direction:column}.list-tools select,.notification-tools select{width:100%}.notification-tools{align-items:stretch;flex-direction:column}.notification-tools select{margin:0}}
