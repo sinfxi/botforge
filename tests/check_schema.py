@@ -21,6 +21,9 @@ def inspect(label: str, connection: sqlite3.Connection) -> None:
         raise AssertionError(f"{label}: public_id must be indexed uniquely")
     if not any("username" in row[1] for row in connection.execute("PRAGMA index_list(users)")):
         raise AssertionError(f"{label}: username must be indexed uniquely")
+    owner_index = connection.execute("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_users_single_owner'").fetchone()
+    if not owner_index or "WHERE role = 'owner'" not in owner_index[0]:
+        raise AssertionError(f"{label}: a partial unique index must enforce one owner")
 
 def check_uniqueness(label: str, connection: sqlite3.Connection) -> None:
     values = ("u1", "1234", "u1@accounts.botforge.invalid", "alpha", "hash", "salt")
@@ -42,6 +45,19 @@ def check_uniqueness(label: str, connection: sqlite3.Connection) -> None:
             pass
         else:
             raise AssertionError(f"{label}: duplicate {column} was accepted")
+    connection.execute(
+        "INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?,?)",
+        ("owner1", "1111", "owner1@accounts.botforge.invalid", "owner_1111", "hash", "salt", "owner"),
+    )
+    try:
+        connection.execute(
+            "INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?,?)",
+            ("owner2", "2222", "owner2@accounts.botforge.invalid", "owner_2222", "hash", "salt", "owner"),
+        )
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError(f"{label}: a second owner was accepted")
     connection.close()
 
 def main() -> None:
