@@ -25,7 +25,7 @@
         <p>نمایی یکپارچه از فعالیت‌ها، اعضا و کیفیت کتابخانه سورس‌ها.</p>
         <div class="workspace-identity">
           <span class="identity-avatar">F</span>
-          <span><b id="account-username">در حال بررسی حساب…</b><small id="account-role">در حال دریافت سطح دسترسی</small><small id="account-id">شناسه: در حال دریافت…</small></span>
+          <span><b id="account-username">در حال بررسی حساب…</b><small id="account-role">در حال دریافت سطح دسترسی</small><small id="account-id">شناسه: در حال دریافت…</small><small id="account-id">شناسه: در حال دریافت…</small></span>
         </div>
       </div>
       <div class="workspace-orbit" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-core">FXI</div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div>
@@ -171,6 +171,7 @@
         } catch { return []; }
       })();
       $("#account-username").textContent = me.user.username;
+      $("#account-id").textContent = "شناسه: " + me.user.id;
       $("#account-id").textContent = "شناسه: " + me.user.id;
       $("#account-role").textContent = isOwner ? "مالک اصلی · دسترسی کامل" : "مدیر محدود · دسترسی بر اساس مجوز";
       $(".identity-avatar").textContent = isOwner ? "O" : "M";
