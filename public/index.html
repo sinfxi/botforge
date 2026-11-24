@@ -45,10 +45,17 @@
     </section>
 
     <section class="section" id="explore">
-      <div class="section-heading"><div><div class="eyebrow">THE COMMUNITY LIBRARY</div><h2>چیزی برای ساختن پیدا کن.</h2></div><span class="muted" id="bot-count">در حال دریافت کتابخانه…</span></div>
-      <div class="catalog-tools"><input id="catalog-search" type="search" placeholder="نام پروژه، موضوع یا قابلیت موردنظرت…" aria-label="جست‌وجوی پروژه‌ها"><select id="catalog-category" aria-label="فیلتر دسته‌بندی"><option value="">همه دسته‌ها</option><option>مدیریت گروه</option><option>ابزار کاربردی</option><option>هوش مصنوعی</option><option>سرگرمی</option><option>فروشگاهی</option><option>سایر</option></select></div>
+      <div class="section-heading"><div><div class="eyebrow">THE COMMUNITY LIBRARY</div><h2>چیزی برای ساختن پیدا کن.</h2></div><div class="catalog-live-tools"><span class="live-indicator" id="live-status" data-state="offline"><i></i><span data-live-label>در حال اتصال…</span></span><span class="muted" id="bot-count">در حال دریافت کتابخانه…</span><button id="catalog-refresh" class="quiet-button catalog-refresh" type="button">↻ تازه‌سازی</button></div></div>
+      <div class="catalog-updated" id="catalog-updated">در حال همگام‌سازی اطلاعات…</div><div class="catalog-tools"><input id="catalog-search" type="search" placeholder="نام پروژه، موضوع یا قابلیت موردنظرت…" aria-label="جست‌وجوی پروژه‌ها"><select id="catalog-category" aria-label="فیلتر دسته‌بندی"><option value="">همه دسته‌ها</option><option>مدیریت گروه</option><option>ابزار کاربردی</option><option>هوش مصنوعی</option><option>سرگرمی</option><option>فروشگاهی</option><option>سایر</option></select></div>
       <div class="bot-grid" id="bot-list"><div class="empty-state">کتابخانه در حال بارگذاری است…</div></div>
     </section>
+    <section class="live-metrics" aria-label="آمار زنده جامعه">
+      <div><span class="eyebrow">COMMUNITY IN MOTION</span><h2>جامعه‌ای که هر روز رشد می‌کند.</h2></div>
+      <article><span>پروژه‌های منتشرشده</span><strong data-live-stat="projects">—</strong><small>از کتابخانه عمومی</small></article>
+      <article><span>سازندگان عضو</span><strong data-live-stat="creators">—</strong><small>حساب‌های فعال</small></article>
+      <article><span>دریافت فایل‌ها</span><strong data-live-stat="downloads">—</strong><small>دریافت‌های ثبت‌شده</small></article>
+    </section>
+
 
     <section class="how-section" id="how">
       <div><div class="eyebrow">MADE FOR BUILDERS</div><h2>از اولین commit<br>تا انتشار در جامعه.</h2><p class="hero-copy">مسیر انتشار را روشن و قابل پیگیری نگه داشته‌ایم تا به‌جای درگیر شدن با فرایندها، روی ساختن تمرکز کنی.</p></div>
