@@ -50,7 +50,7 @@ async function requireAdmin(request, env) {
   if (auth.response) return auth;
   return ["admin", "owner"].includes(auth.user.role) ? auth : { response: json({ error: "اجازه دسترسی ندارید." }, 403) };
 }
-function safePermissions(value) { try { const p=JSON.parse(value || "null"); return Array.isArray(p) ? p.filter(x => ["submissions","users","bots","audit"].includes(x)) : ["submissions","users","bots","audit"]; } catch { return ["submissions","users","bots","audit"]; } }
+function safePermissions(value) { try { const p=JSON.parse(value || "[]"); return Array.isArray(p) ? [...new Set(p.filter(x => ["submissions","users","bots","audit"].includes(x)))] : []; } catch { return []; } }
 function sameOrigin(request) {
   const requestUrl = new URL(request.url);
   const origin = request.headers.get("origin");
@@ -270,14 +270,20 @@ async function handleApi(request, env, url) {
       if (!permissions.includes(capability)) return json({error:"این دسترسی برای حساب مدیر فعال نیست."},403);
     }
     if (path === "/api/admin/overview" && method === "GET") {
-      const [users, bots, pending, submissions, downloads] = await Promise.all([
-        env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),
-        env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE status='published'").first(),
+      const permissions = admin.user.role === "owner"
+        ? ["submissions", "users", "bots", "audit"]
+        : safePermissions(admin.user.permissions_json);
+      const result = {};
+      const jobs = [];
+      if (permissions.includes("users")) jobs.push(env.DB.prepare("SELECT COUNT(*) AS count FROM users").first().then(row => { result.users = row.count; }));
+      if (permissions.includes("bots")) jobs.push(env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE status='published'").first().then(row => { result.bots = row.count; }));
+      if (permissions.includes("submissions")) jobs.push(Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS count FROM submissions WHERE status='pending'").first(),
-        env.DB.prepare("SELECT COUNT(*) AS count FROM submissions").first(),
-        env.DB.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action='bot.download'").first()
-      ]);
-      return json({ users: users.count, bots: bots.count, pending: pending.count, submissions: submissions.count, downloads: downloads.count });
+        env.DB.prepare("SELECT COUNT(*) AS count FROM submissions").first()
+      ]).then(([pending, submissions]) => { result.pending = pending.count; result.submissions = submissions.count; }));
+      if (permissions.includes("audit")) jobs.push(env.DB.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action='bot.download'").first().then(row => { result.downloads = row.count; }));
+      await Promise.all(jobs);
+      return json(result);
     }
     if (path === "/api/admin/submissions" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT s.id,s.title,s.description,s.category,s.original_filename,s.file_size,s.status,s.created_at,u.email AS uploader_email FROM submissions s JOIN users u ON u.id=s.user_id ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END,s.created_at DESC LIMIT 100").all();
@@ -328,7 +334,8 @@ async function handleApi(request, env, url) {
       if (userStatus[1] === admin.user.id) return json({ error: "نمی‌توانی حساب خودت را غیرفعال کنی." }, 400);
       const target = await env.DB.prepare("SELECT id,email,role FROM users WHERE id=?").bind(userStatus[1]).first();
       if (!target) return json({ error: "کاربر پیدا نشد." }, 404);
-      if (target.role === "owner" && admin.user.role !== "owner") return json({ error: "فقط مالک می‌تواند حساب مالک را تغییر دهد." }, 403);
+      if (target.role === "owner" && admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند حساب مالک را تغییر دهد." }, 403);
+      if (target.role === "admin" && admin.user.role !== "owner") return json({ error: "مدیران فقط توسط مالک اصلی قابل مدیریت هستند." }, 403);
       const status = userStatus[2].toLowerCase() === "suspend" ? "suspended" : "active";
       await env.DB.prepare("UPDATE users SET status=?,updated_at=? WHERE id=?").bind(status, now(), target.id).run();
       if (status === "suspended") await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
