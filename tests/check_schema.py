@@ -28,14 +28,18 @@ def check_uniqueness(label: str, connection: sqlite3.Connection) -> None:
         "INSERT INTO users (id,public_id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?,?)",
         values,
     )
-    for column, duplicate in (("public_id", "1234"), ("username", "alpha")):
+    cases = [
+        ("public_id", ("u2", "1234", "u2@accounts.botforge.invalid", "beta", "hash", "salt")),
+        ("username", ("u3", "5678", "u3@accounts.botforge.invalid", "alpha", "hash", "salt")),
+    ]
+    for column, row in cases:
         try:
             connection.execute(
-                f"INSERT INTO users (id,public_id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?,?)",
-                ("u2", duplicate, "u2@accounts.botforge.invalid", "beta", "hash", "salt"),
+                "INSERT INTO users (id,public_id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?,?)",
+                row,
             )
         except sqlite3.IntegrityError:
-            connection.rollback()
+            pass
         else:
             raise AssertionError(f"{label}: duplicate {column} was accepted")
     connection.close()
