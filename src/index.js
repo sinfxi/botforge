@@ -257,7 +257,10 @@ async function handleApi(request, env, url) {
     if (!object) return json({ error: "فایل در دسترس نیست." }, 404);
     await audit(env, null, "bot.download", "bot", download[1]);
     const encodedName = encodeURIComponent(bot.original_filename || "source.zip");
-    return new Response(object, { headers: { "content-type": "application/zip", "content-disposition": "attachment; filename=\"source.zip\"; filename*=UTF-8''" + encodedName, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+    const extension = (bot.original_filename || "").split(".").pop().toLowerCase();
+    const mimeTypes = { zip:"application/zip", py:"text/x-python; charset=utf-8", js:"text/javascript; charset=utf-8", mjs:"text/javascript; charset=utf-8", ts:"text/plain; charset=utf-8", html:"text/html; charset=utf-8", css:"text/css; charset=utf-8", json:"application/json; charset=utf-8", md:"text/markdown; charset=utf-8", txt:"text/plain; charset=utf-8", pdf:"application/pdf", png:"image/png", jpg:"image/jpeg", jpeg:"image/jpeg", webp:"image/webp", svg:"image/svg+xml", xml:"application/xml; charset=utf-8", csv:"text/csv; charset=utf-8" };
+    const contentType = mimeTypes[extension] || "application/octet-stream";
+    return new Response(object, { headers: { "content-type": contentType, "content-disposition": "attachment; filename=\"source.zip\"; filename*=UTF-8''" + encodedName, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
 
   if (path.startsWith("/api/admin/")) {
@@ -399,32 +402,40 @@ async function handleApi(request, env, url) {
       const title = safeText(form.get("title"), 90);
       const description = safeText(form.get("description"), 1200);
       const category = safeText(form.get("category"), 40);
+      const kind = String(form.get("kind") || "");
       const rights = form.get("rights") === "on";
-      const file = form.get("file");
-      if (title.length < 3 || description.length < 10 || !category || !rights || !(file instanceof File)) {
-        return json({ error: "نام پروژه، توضیحات، دسته‌بندی، فایل و تأیید حق انتشار الزامی است." }, 400);
-      }
-      if (!file.name.toLowerCase().endsWith(".zip") || file.size < 4 || file.size > (Number(env.MAX_UPLOAD_BYTES) || MAX_UPLOAD)) {
-        return json({ error: "فقط فایل ZIP با حجم حداکثر ۵ مگابایت پذیرفته می‌شود." }, 400);
-      }
-      const bytes = await file.arrayBuffer();
-      const head = new Uint8Array(bytes.slice(0, 4));
-      if (!(head[0] === 0x50 && head[1] === 0x4b && [0x03,0x05,0x07].includes(head[2]) && [0x04,0x06,0x08].includes(head[3]))) {
-        return json({ error: "ساختار فایل ZIP معتبر نیست." }, 400);
-      }
+      if (title.length < 3 || description.length < 10 || !category || !rights) return json({ error: "نام، توضیحات، دسته‌بندی و تأیید حق انتشار الزامی است." }, 400);
+      let bytes, filename;
+      if (kind === "code") {
+        const code = String(form.get("code") || "");
+        filename = safeFilename(String(form.get("code_filename") || ""));
+        if (!code.trim() || code.length > 200000 || !/^[a-zA-Z0-9._-]{1,100}$/.test(filename)) return json({ error: "کد یا نام فایل معتبر نیست؛ از نامی مثل main.py استفاده کن." }, 400);
+        bytes = new TextEncoder().encode(code);
+      } else if (kind === "zip" || kind === "file") {
+        const file = form.get("file");
+        if (!(file instanceof File) || file.size < 1 || file.size > (Number(env.MAX_UPLOAD_BYTES) || MAX_UPLOAD)) return json({ error: "فایل خالی است یا از سقف ۵ مگابایت بیشتر است." }, 400);
+        filename = safeFilename(file.name);
+        if (!filename || filename.length > 120) return json({ error: "نام فایل معتبر نیست." }, 400);
+        bytes = await file.arrayBuffer();
+        if (kind === "zip") {
+          if (!filename.toLowerCase().endsWith(".zip")) return json({ error: "برای این حالت فقط فایل ZIP انتخاب کن." }, 400);
+          const head = new Uint8Array(bytes.slice(0, 4));
+          if (!(head[0] === 0x50 && head[1] === 0x4b && [0x03,0x05,0x07].includes(head[2]) && [0x04,0x06,0x08].includes(head[3]))) return json({ error: "ساختار فایل ZIP معتبر نیست." }, 400);
+        }
+      } else return json({ error: "نوع انتشار را انتخاب کن." }, 400);
       const botId = id();
       const slug = `${slugify(title)}-${botId.slice(0,8)}`;
-      const objectKey = `published/${slug}.zip`;
+      const objectKey = `published/${slug}/${filename}`;
       await env.FILES.put(objectKey, bytes);
       try {
         await env.DB.prepare("INSERT INTO bots (id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES (?,?,?,?,?,?,?,?,?)")
-          .bind(botId, slug, title, description, category, objectKey, safeFilename(file.name) || "source.zip", file.size, admin.user.id).run();
+          .bind(botId, slug, title, description, category, objectKey, filename, bytes.byteLength, admin.user.id).run();
       } catch (error) {
         await env.FILES.delete(objectKey);
         throw error;
       }
-      await audit(env, admin.user.id, "bot.publish.direct", "bot", botId, { title, category, file_size: file.size });
-      return json({ ok: true, id: botId, slug, message: "پروژه مستقیماً منتشر شد." }, 201);
+      await audit(env, admin.user.id, "bot.publish.direct", "bot", botId, { title, category, kind, filename, file_size: bytes.byteLength });
+      return json({ ok: true, id: botId, slug, kind, filename, message: "محتوا مستقیماً منتشر شد." }, 201);
     }
     if (path === "/api/admin/bots" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT id,slug,title,category,file_size,status,published_at FROM bots ORDER BY published_at DESC LIMIT 200").all();
