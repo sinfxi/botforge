@@ -20,8 +20,8 @@
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
       <form id="auth-form" novalidate>
         <div class="field">
-          <label for="email">آدرس ایمیل</label>
-          <input id="email" type="email" autocomplete="email" placeholder="name@example.com" required maxlength="254">
+          <label for="username">نام کاربری</label>
+          <input id="username" type="text" autocomplete="username" placeholder="مثلاً fxi_user" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+">
         </div>
         <div class="field">
           <label for="password">رمز عبور</label>
@@ -38,7 +38,7 @@
   const form = $("#auth-form");
   const notice = $("#notice");
   const button = $("#submit");
-  const email = $("#email");
+  const username = $("#username");
   const password = $("#password");
   let registerMode = false;
   let busy = false;
@@ -72,10 +72,10 @@
     event.preventDefault();
     if (busy) return;
     clearNotice();
-    const normalizedEmail = email.value.trim().toLowerCase();
-    if (!email.validity.valid || !normalizedEmail) {
-      showNotice("یک آدرس ایمیل معتبر وارد کن.", "error");
-      email.focus();
+    const normalizedUsername = username.value.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+      showNotice("نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد.", "error");
+      username.focus();
       return;
     }
     if (password.value.length < 10 || password.value.length > 200) {
@@ -93,15 +93,15 @@
         credentials: "same-origin",
         cache: "no-store",
         headers: { "content-type": "application/json", "accept": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, password: password.value })
+        body: JSON.stringify({ username: normalizedUsername, password: password.value })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `درخواست ناموفق بود (کد ${response.status}).`);
       if (registerMode) {
         setMode(false);
-        email.value = normalizedEmail;
+        username.value = normalizedUsername;
         password.value = "";
-        showNotice("حساب با موفقیت ساخته شد؛ حالا با همین ایمیل وارد شو.", "success");
+        showNotice("حساب با موفقیت ساخته شد؛ حالا با همین نام کاربری وارد شو.", "success");
         password.focus();
       } else {
         location.replace("/dashboard.html");
