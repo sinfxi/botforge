@@ -20,7 +20,7 @@
         <div class="eyebrow"><span class="pulse"></span> YOUR CREATOR SPACE</div>
         <h1>فضای شخصی تو</h1>
         <p>پروژه‌هایت را ارسال کن، وضعیت بررسی را ببین و از نتیجه‌ها باخبر شو.</p>
-        <div class="workspace-identity"><span class="identity-avatar" id="avatar">U</span><span><b id="username">در حال بررسی حساب…</b><small id="role-label">عضو BotForge</small><small id="user-id">شناسه: در حال دریافت…</small></span></div>
+        <div class="workspace-identity"><span class="identity-avatar" id="avatar">U</span><span><b id="username">در حال بررسی حساب…</b><small id="role-label">عضو BotForge</small><small id="user-id">شناسه: در حال دریافت…</small><small id="user-id">شناسه: در حال دریافت…</small></span></div>
       </div>
       <div class="workspace-orbit" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-core">FXI</div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div>
       <span class="hero-decoration">CREATOR</span>
@@ -108,6 +108,7 @@
       const me = await api("/api/me");
       currentUser = me.user;
       $("#username").textContent = currentUser.username;
+      $("#user-id").textContent = "شناسه: " + currentUser.id;
       $("#user-id").textContent = "شناسه: " + currentUser.id;
       $("#avatar").textContent = currentUser.role === "owner" ? "O" : currentUser.role === "admin" ? "M" : "U";
       $("#role-label").textContent = currentUser.role === "owner" ? "مالک اصلی BotForge" : currentUser.role === "admin" ? "مدیر BotForge" : "عضو BotForge";
