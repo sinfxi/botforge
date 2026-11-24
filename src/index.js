@@ -85,11 +85,12 @@ async function handleApi(request, env, url) {
 
   if (path === "/api/auth/bootstrap" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
-    if (!env.BOOTSTRAP_OWNER_USERNAME || !env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "Secretهای BOOTSTRAP_OWNER_USERNAME و BOOTSTRAP_OWNER_PASSWORD را تنظیم کن." }, 503);
+    const configuredUsername = safeText(env.BOOTSTRAP_OWNER_USERNAME || String(env.BOOTSTRAP_OWNER_EMAIL || "").split("@")[0], 24).toLowerCase();
+    if (!configuredUsername || !env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "دو Secret با نام‌های BOOTSTRAP_OWNER_USERNAME و BOOTSTRAP_OWNER_PASSWORD را در تنظیمات Worker ثبت کن." }, 503);
     const existing = await env.DB.prepare("SELECT id FROM users WHERE role IN ('owner','admin') LIMIT 1").first();
     if (existing) return json({ error: "حساب مدیر قبلاً ساخته شده است." }, 409);
     const body = await request.json().catch(() => null), username = safeText(body?.username, 24).toLowerCase(), password = typeof body?.password === "string" ? body.password : "";
-    if (!/^[a-z0-9_]{3,24}$/.test(username) || username !== env.BOOTSTRAP_OWNER_USERNAME.toLowerCase() || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "نام کاربری یا رمز راه‌اندازی صحیح نیست." }, 401);
+    if (!/^[a-z0-9_]{3,24}$/.test(username) || username !== configuredUsername || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "نام کاربری یا رمز راه‌اندازی صحیح نیست." }, 401);
     const salt = id(), userId = id();
     await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?, 'owner')").bind(userId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
     await audit(env, userId, "owner.bootstrap", "user", userId);
@@ -364,7 +365,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) {
       try { return await handleApi(request, env, url); }
-      catch (error) { console.error("API error:", error); return json({ error: "خطای داخلی سرور رخ داد." }, 500); }
+      catch (error) { const requestId = id(); console.error("API request failed:", requestId, error); return json({ error: "ارتباط با سرویس کامل نشد. وضعیت اتصال را بررسی کن و دوباره تلاش کن.", request_id: requestId }, 500); }
     }
     if (!env.FILES) return new Response("Storage unavailable", { status: 503 });
     const assetPath = url.pathname === "/" ? "/index.html" : url.pathname;
