@@ -23,7 +23,7 @@
           <label for="user-id">شناسه کاربری</label>
           <input id="user-id" type="text" inputmode="numeric" autocomplete="off" placeholder="شناسه ۴ رقمی حساب" maxlength="4" pattern="[0-9]{4}">
         </div>
-        <div class="field">
+        <div class="field" id="username-field">
           <label for="username">نام کاربری</label>
           <input id="username" type="text" autocomplete="username" placeholder="مثلاً fxi_user" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+">
         </div>
@@ -82,6 +82,8 @@
     password.autocomplete = registerMode ? "new-password" : "current-password";
     $("#user-id-field").hidden = registerMode;
     userId.required = !registerMode;
+    $("#username-field").hidden = !registerMode;
+    username.required = registerMode;
     password.placeholder = registerMode ? "حداقل ۱۰ کاراکتر" : "رمز عبور حساب";
     clearNotice();
   }
@@ -91,7 +93,7 @@
     if (busy) return;
     clearNotice();
     const normalizedUsername = username.value.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+    if (registerMode && !/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
       showNotice("نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد.", "error");
       username.focus();
       return;
@@ -119,7 +121,7 @@
         cache: "no-store",
         redirect: "error",
         headers: { "content-type": "application/json", "accept": "application/json" },
-        body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), username: normalizedUsername, password: password.value })
+        body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), password: password.value })
       };
       let response;
       try {
@@ -150,6 +152,8 @@
       button.innerHTML = registerMode ? "ساخت حساب <span>←</span>" : "ورود به حساب <span>←</span>";
     }
   });
+
+  setMode(false);
 
   fetch("/api/me", { credentials: "same-origin", cache: "no-store" })
     .then(async (response) => { if (response.ok) { const data = await response.json(); location.replace(["owner","admin"].includes(data.user?.role) ? "/admin.html" : "/dashboard.html"); } })
