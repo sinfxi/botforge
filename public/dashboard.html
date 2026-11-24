@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="فضای شخصی اعضای FXI BotForge">
   <title>حساب من | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=botforge-usernames-20261124">
+  <link rel="stylesheet" href="/styles.css?v=botforge-auth-20261124">
 </head>
 <body class="page-dashboard">
   <header class="topbar workspace-topbar">
@@ -76,7 +76,14 @@
     const headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof FormData) && !headers.has("content-type")) headers.set("content-type", "application/json");
     headers.set("accept", "application/json");
-    const response = await fetch(url, { credentials:"same-origin", cache:"no-store", ...options, headers });
+    let response;
+    try {
+      response = await fetch(url, { credentials:"same-origin", cache:"no-store", ...options, headers });
+    } catch (cause) {
+      const error = new Error("ارتباط با سرور برقرار نشد. اتصال اینترنت و آدرس سایت را بررسی کن و دوباره تلاش کن.");
+      error.cause = cause;
+      throw error;
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { const error = new Error(data.error || "درخواست ناموفق بود."); error.status = response.status; throw error; }
     return data;
