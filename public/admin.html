@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="مرکز مدیریت FXI BotForge">
   <title>مرکز مدیریت | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=botforge-workspace-publish-20261124">
+  <link rel="stylesheet" href="/styles.css?v=botforge-workspace-multiupload-20261124">
 </head>
 <body class="page-admin">
   <header class="topbar workspace-topbar">
@@ -79,16 +79,27 @@
     </section>
 
     <section class="panel workspace-panel" id="publish-panel" hidden>
-      <div class="panel-heading"><div><span class="eyebrow">DIRECT PUBLISH</span><h2>انتشار مستقیم سورس</h2><p class="panel-subtitle">بدون انتظار در صف بررسی، یک پروژه را از طرف مدیریت به کتابخانه اضافه کن.</p></div><span class="panel-mark">✦</span></div>
-      <form id="publish-form" class="publish-form" enctype="multipart/form-data">
-        <div class="publish-intro"><span class="publish-icon">＋</span><div><b>افزودن پروژه جدید به BotForge</b><small>فایل ZIP پس از اعتبارسنجی مستقیماً منتشر می‌شود و در کتابخانه عمومی قرار می‌گیرد.</small></div></div>
-        <div class="publish-fields">
-          <div class="field"><label for="publish-title">نام پروژه</label><input id="publish-title" name="title" required minlength="3" maxlength="90" placeholder="مثلاً FXI Telegram Assistant"></div>
-          <div class="field"><label for="publish-category">دسته‌بندی</label><select id="publish-category" name="category" required><option value="">انتخاب دسته‌بندی</option><option>ربات تلگرام</option><option>وب‌سایت و وب‌اپ</option><option>ابزار توسعه</option><option>هوش مصنوعی</option><option>امنیت و شبکه</option><option>اپلیکیشن</option><option>سایر</option></select></div>
-          <div class="field publish-description"><label for="publish-description">توضیحات پروژه</label><textarea id="publish-description" name="description" required minlength="10" maxlength="1200" rows="4" placeholder="قابلیت‌ها، پیش‌نیازها و روش استفاده را توضیح بده…"></textarea></div>
+      <div class="panel-heading"><div><span class="eyebrow">DIRECT PUBLISH</span><h2>انتشار مستقیم محتوا</h2><p class="panel-subtitle">کد بنویس، فایل ZIP پروژه را بفرست یا یک فایل مستقل منتشر کن.</p></div><span class="panel-mark">✦</span></div>
+      <form id="publish-form" class="publish-form">
+        <div class="publish-intro"><span class="publish-icon">＋</span><div><b>افزودن محتوا به کتابخانه</b><small>محتوا پس از بررسی نوع و حجم، مستقیماً منتشر می‌شود.</small></div></div>
+        <div class="publish-mode" role="group" aria-label="نوع محتوا">
+          <label><input type="radio" name="kind" value="code" checked><span>⌨ نوشتن کد</span></label>
+          <label><input type="radio" name="kind" value="zip"><span>▣ فایل ZIP</span></label>
+          <label><input type="radio" name="kind" value="file"><span>⇧ فایل تکی</span></label>
         </div>
-        <label class="publish-drop" for="publish-file"><span class="drop-symbol">⇧</span><b id="publish-file-name">فایل ZIP پروژه را انتخاب کن</b><small>حداکثر ۵ مگابایت · فقط فایل ZIP معتبر</small><input id="publish-file" name="file" type="file" accept=".zip,application/zip" required></label>
-        <label class="publish-rights"><input type="checkbox" name="rights" required><span>تأیید می‌کنم اجازه انتشار این سورس را دارم و فایل حاوی اطلاعات محرمانه، رمزها یا کلیدهای API نیست.</span></label>
+        <div class="publish-fields">
+          <div class="field"><label for="publish-title">نام پروژه / محتوا</label><input id="publish-title" name="title" required minlength="3" maxlength="90" placeholder="مثلاً FXI Telegram Assistant"></div>
+          <div class="field"><label for="publish-category">دسته‌بندی</label><select id="publish-category" name="category" required><option value="">انتخاب دسته‌بندی</option><option>ربات تلگرام</option><option>وب‌سایت و وب‌اپ</option><option>ابزار توسعه</option><option>هوش مصنوعی</option><option>امنیت و شبکه</option><option>اپلیکیشن</option><option>سایر</option></select></div>
+          <div class="field publish-description"><label for="publish-description">توضیحات</label><textarea id="publish-description" name="description" required minlength="10" maxlength="1200" rows="3" placeholder="قابلیت‌ها، پیش‌نیازها و روش استفاده…"></textarea></div>
+        </div>
+        <div id="publish-code-fields" class="publish-source-fields">
+          <div class="field"><label for="publish-code-name">نام فایل کد</label><input id="publish-code-name" name="code_filename" value="main.py" maxlength="100" placeholder="مثلاً index.js"></div>
+          <div class="field"><label for="publish-code">محتوای کد</label><textarea id="publish-code" name="code" rows="12" spellcheck="false" dir="ltr" class="code-editor" placeholder="# کد خود را اینجا بنویس یا جای‌گذاری کن…" maxlength="200000"></textarea><small class="editor-hint">حداکثر ۲۰۰ کیلوبایت · کد به‌صورت فایل قابل دریافت ذخیره می‌شود.</small></div>
+        </div>
+        <div id="publish-upload-fields" class="publish-source-fields" hidden>
+          <label class="publish-drop" for="publish-file"><span class="drop-symbol">⇧</span><span><b id="publish-file-name">فایل موردنظر را انتخاب کن</b><small id="publish-file-help">حداکثر ۵ مگابایت</small></span><input id="publish-file" name="file" type="file"></label>
+        </div>
+        <label class="publish-rights"><input type="checkbox" name="rights" required><span>تأیید می‌کنم اجازه انتشار این محتوا را دارم و فایل حاوی رمز، کلید API یا اطلاعات محرمانه نیست.</span></label>
         <div class="publish-actions"><button class="button" type="submit">انتشار در کتابخانه <span>↗</span></button><span id="publish-message" class="inline-message" role="status"></span></div>
       </form>
     </section>
@@ -248,33 +259,52 @@
   });
 
   const publishFile = $("#publish-file");
+  const publishMode = () => $("input[name='kind']:checked", $("#publish-form")).value;
+  const updatePublishMode = () => {
+    const kind = publishMode();
+    $("#publish-code-fields").hidden = kind !== "code";
+    $("#publish-upload-fields").hidden = kind === "code";
+    publishFile.accept = kind === "zip" ? ".zip,application/zip" : "*/*";
+    $("#publish-file-help").textContent = kind === "zip" ? "فقط ZIP معتبر · حداکثر ۵ مگابایت" : "فایل مستقل با هر پسوند رایج · حداکثر ۵ مگابایت";
+    $("#publish-file-name").textContent = kind === "zip" ? "فایل ZIP پروژه را انتخاب کن" : "فایل موردنظر را انتخاب کن";
+  };
+  $$("input[name='kind']", $("#publish-form")).forEach(input => input.addEventListener("change", updatePublishMode));
   publishFile.addEventListener("change", () => {
     const file = publishFile.files?.[0];
-    $("#publish-file-name").textContent = file ? file.name + " · " + number((file.size / 1024).toFixed(1)) + " KB" : "فایل ZIP پروژه را انتخاب کن";
+    $("#publish-file-name").textContent = file ? file.name + " · " + number((file.size / 1024).toFixed(1)) + " KB" : "فایل موردنظر را انتخاب کن";
   });
   $("#publish-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
     const button = event.submitter;
     const messageEl = $("#publish-message");
+    const kind = publishMode();
     const file = publishFile.files?.[0];
-    if (!file || file.size > 5 * 1024 * 1024 || !file.name.toLowerCase().endsWith(".zip")) {
-      messageEl.textContent = "یک فایل ZIP معتبر با حجم حداکثر ۵ مگابایت انتخاب کن.";
+    const code = $("#publish-code").value;
+    if (kind === "code" && (!code.trim() || !/^[a-zA-Z0-9._-]{1,100}$/.test($("#publish-code-name").value.trim()))) {
+      messageEl.textContent = "کد و نام فایل معتبر (مثل main.py) را وارد کن.";
+      return;
+    }
+    if (kind !== "code" && (!file || file.size > 5 * 1024 * 1024 || (kind === "zip" && !file.name.toLowerCase().endsWith(".zip")))) {
+      messageEl.textContent = kind === "zip" ? "یک فایل ZIP معتبر با حجم حداکثر ۵ مگابایت انتخاب کن." : "یک فایل با حجم حداکثر ۵ مگابایت انتخاب کن.";
       return;
     }
     button.disabled = true;
-    messageEl.textContent = "در حال اعتبارسنجی و انتشار فایل…";
+    messageEl.textContent = "در حال اعتبارسنجی و انتشار…";
     try {
       const data = new FormData(form);
       await api("/api/admin/bots/publish", { method:"POST", body:data });
-      messageEl.textContent = "پروژه با موفقیت در کتابخانه منتشر شد.";
+      messageEl.textContent = "محتوا با موفقیت در کتابخانه منتشر شد.";
       form.reset();
-      $("#publish-file-name").textContent = "فایل ZIP پروژه را انتخاب کن";
+      $("#publish-code-name").value = "main.py";
+      $("#publish-file-name").textContent = "فایل موردنظر را انتخاب کن";
+      updatePublishMode();
       await load();
     } catch (error) {
-      messageEl.textContent = error.message || "انتشار پروژه انجام نشد.";
+      messageEl.textContent = error.message || "انتشار انجام نشد.";
     } finally { button.disabled = false; }
   });
+  updatePublishMode();
 
   $("#manager-list").addEventListener("click", async event => {
     const save = event.target.closest("[data-manager-save]");
