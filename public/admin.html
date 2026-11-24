@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="مرکز مدیریت FXI BotForge">
   <title>مرکز مدیریت | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=botforge-workspace-20261124">
+  <link rel="stylesheet" href="/styles.css?v=botforge-workspace-publish-20261124">
 </head>
 <body class="page-admin">
   <header class="topbar workspace-topbar">
@@ -76,6 +76,21 @@
       </form>
       <div class="manager-list-head"><div><h3>مدیران فعلی</h3><p class="panel-subtitle">دسترسی‌ها را بازبینی یا نقش مدیریت را لغو کن.</p></div><span id="manager-count" class="count-chip">۰ مدیر</span></div>
       <div id="manager-list" class="manager-list"><div class="skeleton-row"></div></div>
+    </section>
+
+    <section class="panel workspace-panel" id="publish-panel" hidden>
+      <div class="panel-heading"><div><span class="eyebrow">DIRECT PUBLISH</span><h2>انتشار مستقیم سورس</h2><p class="panel-subtitle">بدون انتظار در صف بررسی، یک پروژه را از طرف مدیریت به کتابخانه اضافه کن.</p></div><span class="panel-mark">✦</span></div>
+      <form id="publish-form" class="publish-form" enctype="multipart/form-data">
+        <div class="publish-intro"><span class="publish-icon">＋</span><div><b>افزودن پروژه جدید به BotForge</b><small>فایل ZIP پس از اعتبارسنجی مستقیماً منتشر می‌شود و در کتابخانه عمومی قرار می‌گیرد.</small></div></div>
+        <div class="publish-fields">
+          <div class="field"><label for="publish-title">نام پروژه</label><input id="publish-title" name="title" required minlength="3" maxlength="90" placeholder="مثلاً FXI Telegram Assistant"></div>
+          <div class="field"><label for="publish-category">دسته‌بندی</label><select id="publish-category" name="category" required><option value="">انتخاب دسته‌بندی</option><option>ربات تلگرام</option><option>وب‌سایت و وب‌اپ</option><option>ابزار توسعه</option><option>هوش مصنوعی</option><option>امنیت و شبکه</option><option>اپلیکیشن</option><option>سایر</option></select></div>
+          <div class="field publish-description"><label for="publish-description">توضیحات پروژه</label><textarea id="publish-description" name="description" required minlength="10" maxlength="1200" rows="4" placeholder="قابلیت‌ها، پیش‌نیازها و روش استفاده را توضیح بده…"></textarea></div>
+        </div>
+        <label class="publish-drop" for="publish-file"><span class="drop-symbol">⇧</span><b id="publish-file-name">فایل ZIP پروژه را انتخاب کن</b><small>حداکثر ۵ مگابایت · فقط فایل ZIP معتبر</small><input id="publish-file" name="file" type="file" accept=".zip,application/zip" required></label>
+        <label class="publish-rights"><input type="checkbox" name="rights" required><span>تأیید می‌کنم اجازه انتشار این سورس را دارم و فایل حاوی اطلاعات محرمانه، رمزها یا کلیدهای API نیست.</span></label>
+        <div class="publish-actions"><button class="button" type="submit">انتشار در کتابخانه <span>↗</span></button><span id="publish-message" class="inline-message" role="status"></span></div>
+      </form>
     </section>
 
     <section class="panel workspace-panel" id="bots-panel" hidden>
@@ -191,7 +206,7 @@
       $(".identity-avatar").textContent = isOwner ? "O" : "M";
       showSection("manager-panel", isOwner);
       showSection("no-permissions", !isOwner && permissions.length === 0);
-      for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["audit-panel","audit"]]) showSection(id, permissions.includes(key));
+      for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["publish-panel","bots"],["audit-panel","audit"]]) showSection(id, permissions.includes(key));
       const overview = await api("/api/admin/overview");
       setStat("users", overview.users);
       setStat("bots", overview.bots);
@@ -230,6 +245,35 @@
       await loadManagers();
     } catch (error) { $("#manager-message").textContent = error.message; }
     finally { button.disabled = false; }
+  });
+
+  const publishFile = $("#publish-file");
+  publishFile.addEventListener("change", () => {
+    const file = publishFile.files?.[0];
+    $("#publish-file-name").textContent = file ? file.name + " · " + number((file.size / 1024).toFixed(1)) + " KB" : "فایل ZIP پروژه را انتخاب کن";
+  });
+  $("#publish-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = event.submitter;
+    const messageEl = $("#publish-message");
+    const file = publishFile.files?.[0];
+    if (!file || file.size > 5 * 1024 * 1024 || !file.name.toLowerCase().endsWith(".zip")) {
+      messageEl.textContent = "یک فایل ZIP معتبر با حجم حداکثر ۵ مگابایت انتخاب کن.";
+      return;
+    }
+    button.disabled = true;
+    messageEl.textContent = "در حال اعتبارسنجی و انتشار فایل…";
+    try {
+      const data = new FormData(form);
+      await api("/api/admin/bots/publish", { method:"POST", body:data });
+      messageEl.textContent = "پروژه با موفقیت در کتابخانه منتشر شد.";
+      form.reset();
+      $("#publish-file-name").textContent = "فایل ZIP پروژه را انتخاب کن";
+      await load();
+    } catch (error) {
+      messageEl.textContent = error.message || "انتشار پروژه انجام نشد.";
+    } finally { button.disabled = false; }
   });
 
   $("#manager-list").addEventListener("click", async event => {
