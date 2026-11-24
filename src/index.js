@@ -88,7 +88,7 @@ async function handleApi(request, env, url) {
 
   if (path === "/api/auth/bootstrap" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
-    const configuredUsername = safeText(env.BOOTSTRAP_OWNER_USERNAME || String(env.BOOTSTRAP_OWNER_EMAIL || "").split("@")[0], 24).toLowerCase();
+    const configuredUsername = safeText(env.BOOTSTRAP_OWNER_USERNAME, 24).toLowerCase();
     if (!configuredUsername || !env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "دو Secret با نام‌های BOOTSTRAP_OWNER_USERNAME و BOOTSTRAP_OWNER_PASSWORD را در تنظیمات Worker ثبت کن." }, 503);
     const existing = await env.DB.prepare("SELECT id FROM users WHERE role IN ('owner','admin') LIMIT 1").first();
     if (existing) return json({ error: "حساب مدیر قبلاً ساخته شده است." }, 409);
