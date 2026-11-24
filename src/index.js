@@ -6,6 +6,16 @@ function json(data, status = 200, headers = {}) {
 }
 const id = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
+async function createPublicId(env) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const bytes = new Uint32Array(1);
+    crypto.getRandomValues(bytes);
+    const publicId = String(1000 + (bytes[0] % 9000));
+    const exists = await env.DB.prepare("SELECT 1 FROM users WHERE public_id = ? LIMIT 1").bind(publicId).first();
+    if (!exists) return publicId;
+  }
+  throw new Error("Could not allocate a unique 4-digit public user ID.");
+}
 async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -94,10 +104,10 @@ async function handleApi(request, env, url) {
     if (existing) return json({ error: "حساب مدیر قبلاً ساخته شده است." }, 409);
     const body = await request.json().catch(() => null), username = safeText(body?.username, 24).toLowerCase(), password = typeof body?.password === "string" ? body.password : "";
     if (!/^[a-z0-9_]{3,24}$/.test(username) || username !== configuredUsername || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "نام کاربری یا رمز راه‌اندازی صحیح نیست." }, 401);
-    const salt = id(), userId = id();
-    await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?, 'owner')").bind(userId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
+    const salt = id(), userId = id(), publicId = await createPublicId(env);
+    await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?,?, 'owner')").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
     await audit(env, userId, "owner.bootstrap", "user", userId);
-    return json({ ok: true, user_id: userId, message: "حساب مالک ساخته شد؛ اکنون وارد شوید." }, 201);
+    return json({ ok: true, user_id: publicId, message: "حساب مالک ساخته شد؛ شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
   }
   if (path === "/api/auth/register" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
@@ -105,10 +115,10 @@ async function handleApi(request, env, url) {
     if (!body || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "نام کاربری و رمز عبور را کامل وارد کن." }, 400);
     const username = body.username.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,24}$/.test(username) || body.password.length < 10 || body.password.length > 200) return json({ error: "نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد؛ رمز حداقل ۱۰ کاراکتر باشد." }, 400);
-    const salt = id(), userId = id();
+    const salt = id(), userId = id(), publicId = await createPublicId(env);
     try {
-      await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?)").bind(userId, username + "@accounts.botforge.invalid", username, await passwordHash(body.password, salt), salt).run();
-      return json({ ok: true, user_id: userId, username, message: "حساب ساخته شد. حالا وارد شو." }, 201);
+      await env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?,?)").bind(userId, publicId, username + "@accounts.botforge.invalid", username, await passwordHash(body.password, salt), salt).run();
+      return json({ ok: true, user_id: publicId, username, message: "حساب ساخته شد. شناسه ۴ رقمی را نگه دار و وارد شو." }, 201);
     } catch (error) {
       console.error("Registration failed:", error);
       if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این نام کاربری قبلاً ثبت شده است." }, 409);
@@ -120,8 +130,8 @@ async function handleApi(request, env, url) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body.user_id !== "string" || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری، نام کاربری و رمز عبور را کامل وارد کن." }, 400);
     const userId = safeText(body.user_id, 36).toLowerCase(), username = body.username.trim().toLowerCase();
-    if (!/^[0-9a-f-]{36}$/.test(userId) || !/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "شناسه یا نام کاربری معتبر نیست." }, 400);
-    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE id = ? AND username = ?").bind(userId, username).first();
+    if (!/^\d{4}$/.test(userId) || !/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "شناسه کاربری باید دقیقاً ۴ رقم باشد." }, 400);
+    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE public_id = ? AND username = ?").bind(userId, username).first();
     if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "شناسه کاربری، نام کاربری یا رمز عبور اشتباه است." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
