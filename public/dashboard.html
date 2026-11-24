@@ -27,6 +27,10 @@
     </section>
 
     <div id="page-message" class="workspace-message" role="status" aria-live="polite">در حال اتصال به فضای شخصی…</div>
+    <div class="workspace-toolbar user-toolbar">
+      <div><span class="toolbar-kicker">فضای سازنده</span><b>همه چیز درباره پروژه‌هایت، یک‌جا</b><small>وضعیت بررسی، اعلان‌ها و آمار حساب را پیگیری کن.</small></div>
+      <div class="toolbar-actions"><button id="user-refresh" class="quiet-button" type="button">↻ تازه‌سازی</button><button id="mark-all-read" class="quiet-button" type="button">✓ خواندن همه اعلان‌ها</button></div>
+    </div>
     <section class="stats workspace-stats user-stats">
       <article class="stat"><span>کل درخواست‌ها</span><strong id="total-count">—</strong><small>پروژه‌های ارسال‌شده</small></article>
       <article class="stat"><span>در انتظار بررسی</span><strong id="pending-count">—</strong><small>در صف مدیران</small></article>
@@ -49,11 +53,14 @@
 
       <section class="panel workspace-panel">
         <div class="panel-heading"><div><span class="eyebrow">PROJECT TRACKER</span><h2>درخواست‌های من</h2><p class="panel-subtitle">آخرین وضعیت پروژه‌های ارسالی.</p></div><span class="panel-mark">01</span></div>
+        <div class="list-tools"><input id="submission-search" class="list-search" type="search" placeholder="جست‌وجوی پروژه‌ها…" aria-label="جست‌وجوی پروژه‌ها"><select id="submission-filter" aria-label="فیلتر وضعیت پروژه"><option value="">همه وضعیت‌ها</option><option value="pending">در انتظار بررسی</option><option value="approved">تأییدشده</option><option value="rejected">ردشده</option></select></div>
         <div id="submissions" class="data-list"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>
+        <div id="submission-summary" class="section-footnote">آخرین ۵۰ درخواست حساب نمایش داده می‌شود.</div>
       </section>
 
       <section class="panel workspace-panel span2">
         <div class="panel-heading"><div><span class="eyebrow">NOTIFICATIONS</span><h2>اعلان‌ها و به‌روزرسانی‌ها</h2><p class="panel-subtitle">نتیجه بررسی‌ها و خبرهای مربوط به حساب تو.</p></div><span class="panel-mark">02</span></div>
+        <div class="notification-tools"><span id="unread-count" class="count-chip">۰ خوانده‌نشده</span><select id="notification-filter" aria-label="فیلتر اعلان‌ها"><option value="all">همه اعلان‌ها</option><option value="unread">خوانده‌نشده‌ها</option><option value="read">خوانده‌شده‌ها</option></select></div>
         <div id="notifications" class="notification-list"><div class="skeleton-row"></div></div>
       </section>
     </div>
@@ -92,10 +99,17 @@
     return ({ pending:["در انتظار بررسی","pending"], approved:["تأیید و منتشر شد","approved"], rejected:["رد شده","rejected"] })[status] || [status,"pending"];
   }
   function renderSubmissions() {
-    $("#submissions").innerHTML = submissions.length ? submissions.map(item => {
+    const term = ($("#submission-search").value || "").trim().toLocaleLowerCase("fa");
+    const status = $("#submission-filter").value;
+    const filtered = submissions.filter(item => {
+      const text = [item.title,item.category,item.review_note].join(" ").toLocaleLowerCase("fa");
+      return (!term || text.includes(term)) && (!status || item.status === status);
+    });
+    $("#submissions").innerHTML = filtered.length ? filtered.map(item => {
       const [label, cls] = statusInfo(item.status);
-      return '<article class="tracker-item"><div class="tracker-top"><b>' + esc(item.title) + '</b><span class="status-chip ' + cls + '">' + label + '</span></div><small>' + esc(item.category) + ' · ' + fmt(item.created_at, false) + ' · ' + faNumber((item.file_size / 1024).toFixed(1)) + ' KB</small>' + (item.review_note ? '<p class="review-note">' + esc(item.review_note) + '</p>' : '') + '</article>';
-    }).join("") : '<div class="empty-state"><span>⌘</span><b>هنوز پروژه‌ای نفرستادی</b><small>اولین پروژه‌ات را از فرم کناری ارسال کن.</small></div>';
+      return '<article class="tracker-item"><div class="tracker-top"><b>' + esc(item.title) + '</b><span class="status-chip ' + cls + '">' + label + '</span></div><small>' + esc(item.category) + ' · ' + fmt(item.created_at, false) + ' · ' + faNumber((item.file_size / 1024).toFixed(1)) + ' KB</small>' + (item.review_note ? '<p class="review-note"><b>یادداشت بررسی:</b> ' + esc(item.review_note) + '</p>' : '') + (item.reviewed_at ? '<small class="review-date">زمان بررسی: ' + fmt(item.reviewed_at) + '</small>' : '') + '</article>';
+    }).join("") : '<div class="empty-state"><span>⌘</span><b>' + (submissions.length ? "موردی با این فیلتر پیدا نشد" : "هنوز پروژه‌ای نفرستادی") + '</b><small>' + (submissions.length ? "فیلتر یا عبارت جست‌وجو را تغییر بده." : "اولین پروژه‌ات را از فرم کناری ارسال کن.") + '</small></div>';
+    $("#submission-summary").textContent = "نمایش " + faNumber(filtered.length) + " مورد از " + faNumber(submissions.length) + " درخواست ثبت‌شده";
     $("#total-count").textContent = faNumber(submissions.length);
     $("#pending-count").textContent = faNumber(submissions.filter(item => item.status === "pending").length);
     $("#approved-count").textContent = faNumber(submissions.filter(item => item.status === "approved").length);
@@ -107,7 +121,16 @@
   }
   async function loadNotifications() {
     const data = await api("/api/notifications");
-    $("#notifications").innerHTML = data.items.length ? data.items.map(item => '<article class="notification-item ' + (item.read_at ? "is-read" : "is-unread") + '"><span class="notification-symbol">' + (item.type === "success" ? "✓" : item.type === "warning" ? "!" : "✧") + '</span><div class="notification-copy"><b>' + esc(item.title) + '</b><p>' + esc(item.body) + '</p><small>' + fmt(item.created_at) + '</small></div>' + (!item.read_at ? '<button class="mark-read" data-read="' + esc(item.id) + '" type="button">خواندم</button>' : '<span class="read-label">خوانده‌شده</span>') + '</article>').join("") : '<div class="empty-state"><span>✧</span><b>اعلان تازه‌ای نداری</b><small>نتیجه بررسی پروژه‌ها در همین بخش نمایش داده می‌شود.</small></div>';
+    window.botforgeNotifications = Array.isArray(data.items) ? data.items : [];
+    renderNotifications();
+  }
+  function renderNotifications() {
+    const items = window.botforgeNotifications || [];
+    const filter = $("#notification-filter").value;
+    const unread = items.filter(item => !item.read_at).length;
+    $("#unread-count").textContent = faNumber(unread) + " خوانده‌نشده";
+    const filtered = items.filter(item => filter === "unread" ? !item.read_at : filter === "read" ? !!item.read_at : true);
+    $("#notifications").innerHTML = filtered.length ? filtered.map(item => '<article class="notification-item ' + (item.read_at ? "is-read" : "is-unread") + '"><span class="notification-symbol">' + (item.type === "success" ? "✓" : item.type === "warning" ? "!" : "✧") + '</span><div class="notification-copy"><b>' + esc(item.title) + '</b><p>' + esc(item.body) + '</p><small>' + fmt(item.created_at) + '</small></div>' + (!item.read_at ? '<button class="mark-read" data-read="' + esc(item.id) + '" type="button">خواندم</button>' : '<span class="read-label">خوانده‌شده</span>') + '</article>').join("") : '<div class="empty-state"><span>✧</span><b>' + (items.length ? "اعلانی در این فیلتر وجود ندارد" : "اعلان تازه‌ای نداری") + '</b><small>نتیجه بررسی پروژه‌ها در همین بخش نمایش داده می‌شود.</small></div>';
   }
   async function init() {
     showMessage("#page-message", "در حال بررسی نشست و دریافت اطلاعات…");
@@ -144,6 +167,27 @@
       await loadSubmissions();
     } catch (error) { showMessage("#form-message", error.message, "error"); }
     finally { button.disabled = false; button.innerHTML = 'ارسال برای بررسی <span>←</span>'; }
+  });
+  $("#submission-search").addEventListener("input", renderSubmissions);
+  $("#submission-filter").addEventListener("change", renderSubmissions);
+  $("#notification-filter").addEventListener("change", renderNotifications);
+  $("#user-refresh").addEventListener("click", async event => {
+    const button = event.currentTarget; button.disabled = true; button.textContent = "در حال دریافت…";
+    try { await Promise.all([loadSubmissions(),loadNotifications()]); showMessage("#page-message","اطلاعات فضای شخصی به‌روز شد.","success"); }
+    catch (error) { showMessage("#page-message",error.message,"error"); }
+    finally { button.disabled = false; button.textContent = "↻ تازه‌سازی"; }
+  });
+  $("#mark-all-read").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const unread = (window.botforgeNotifications || []).filter(item => !item.read_at);
+    if (!unread.length) { showMessage("#page-message","همه اعلان‌ها قبلاً خوانده شده‌اند.","info"); return; }
+    button.disabled = true;
+    try {
+      await api("/api/notifications/read-all",{method:"POST"});
+      await loadNotifications();
+      showMessage("#page-message","همه اعلان‌ها به‌عنوان خوانده‌شده ثبت شدند.","success");
+    } catch (error) { showMessage("#page-message",error.message,"error"); }
+    finally { button.disabled = false; }
   });
   $("#notifications").addEventListener("click", async event => {
     const button = event.target.closest("[data-read]");
