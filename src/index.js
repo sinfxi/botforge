@@ -37,7 +37,7 @@ async function currentUser(request, env) {
   const token = readCookie(request, "fxi_session");
   if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT users.id, users.email, users.role, users.status FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
+    "SELECT users.id, users.email, users.role, users.status, users.permissions_json FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
   ).bind(await sha256(token), now()).first();
   return row && row.status === "active" ? row : null;
 }
@@ -50,6 +50,7 @@ async function requireAdmin(request, env) {
   if (auth.response) return auth;
   return ["admin", "owner"].includes(auth.user.role) ? auth : { response: json({ error: "اجازه دسترسی ندارید." }, 403) };
 }
+function safePermissions(value) { try { const p=JSON.parse(value || "null"); return Array.isArray(p) ? p.filter(x => ["submissions","users","bots","audit"].includes(x)) : ["submissions","users","bots","audit"]; } catch { return ["submissions","users","bots","audit"]; } }
 function sameOrigin(request) {
   const origin = request.headers.get("origin");
   if (!origin) return false;
@@ -204,6 +205,55 @@ async function handleApi(request, env, url) {
   if (path.startsWith("/api/admin/")) {
     const admin = await requireAdmin(request, env);
     if (admin.response) return admin.response;
+    const managerRoute = path.match(/^\/api\/admin\/managers(?:\/([0-9a-f-]+)\/(permissions|remove))?$/i);
+    if (path === "/api/admin/managers" || managerRoute) {
+      if (admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند مدیران را مدیریت کند." }, 403);
+      if (path === "/api/admin/managers" && method === "GET") {
+        const { results } = await env.DB.prepare("SELECT id,email,status,permissions_json,created_at FROM users WHERE role='admin' ORDER BY created_at DESC").all();
+        return json({ items: (results || []).map(u => ({...u, permissions: safePermissions(u.permissions_json)})) });
+      }
+      if (path === "/api/admin/managers" && method === "POST") {
+        if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+        const body = await request.json().catch(() => null);
+        const email = safeText(body?.email, 254).toLowerCase();
+        const password = typeof body?.password === "string" ? body.password : "";
+        const allowed = ["submissions","users","bots","audit"];
+        const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "ایمیل معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
+        const salt = id(), managerId = id();
+        try {
+          await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?, 'admin', ?)").bind(managerId,email,await passwordHash(password,salt),salt,JSON.stringify(permissions)).run();
+        } catch { return json({ error: "این ایمیل قبلاً ثبت شده یا ساخت مدیر ممکن نیست." }, 409); }
+        await audit(env,admin.user.id,"manager.create","user",managerId,{email,permissions});
+        return json({ok:true,id:managerId},201);
+      }
+      if (managerRoute && managerRoute[1] && managerRoute[2] === "permissions" && method === "POST") {
+        if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+        const target=await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
+        if (!target) return json({error:"مدیر پیدا نشد."},404);
+        const body=await request.json().catch(()=>null), allowed=["submissions","users","bots","audit"];
+        const permissions=Array.isArray(body?.permissions)?[...new Set(body.permissions.filter(p=>allowed.includes(p)))]:[];
+        if (!permissions.length) return json({error:"حداقل یک دسترسی انتخاب کن."},400);
+        await env.DB.prepare("UPDATE users SET permissions_json=?,updated_at=? WHERE id=? AND role='admin'").bind(JSON.stringify(permissions),now(),target.id).run();
+        await audit(env,admin.user.id,"manager.permissions","user",target.id,{permissions});
+        return json({ok:true});
+      }
+      if (managerRoute && managerRoute[1] && managerRoute[2] === "remove" && method === "POST") {
+        if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
+        const target=await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
+        if (!target) return json({error:"مدیر پیدا نشد."},404);
+        await env.DB.prepare("UPDATE users SET role='user',permissions_json=NULL,updated_at=? WHERE id=? AND role='admin'").bind(now(),target.id).run();
+        await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
+        await audit(env,admin.user.id,"manager.remove","user",target.id,{email:target.email});
+        return json({ok:true});
+      }
+      return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
+    }
+    const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : null;
+    if (admin.user.role !== "owner" && capability) {
+      const permissions = safePermissions(admin.user.permissions_json);
+      if (!permissions.includes(capability)) return json({error:"این دسترسی برای حساب مدیر فعال نیست."},403);
+    }
     if (path === "/api/admin/overview" && method === "GET") {
       const [users, bots, pending, submissions, downloads] = await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),
