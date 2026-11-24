@@ -1,7 +1,157 @@
 <!doctype html>
-<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#17231d"><title>حساب من | FXI BotForge</title><link rel="stylesheet" href="/styles.css?v=botforge-motion-20261124"></head><body class="page-dashboard"><header class="topbar"><a class="brand" href="/"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a><div><a class="text-link" href="/admin.html" id="admin-link" hidden>پنل مدیریت</a> <button id="logout" class="text-link" style="border:0;background:none;font:inherit;cursor:pointer;margin-right:18px">خروج از حساب ↗</button></div></header><main class="dash"><div class="eyebrow"><span class="pulse"></span> فضای شخصی توسعه‌دهنده</div><div class="dash-head"><div><h1>سلام، <span id="email">...</span></h1><p class="muted">از اینجا پروژه جدید بفرست و روند بررسی و اعلان‌هایت را دنبال کن.</p></div></div><div class="dash-grid"><section class="panel"><h2>＋ ارسال پروژه جدید</h2><p class="muted">اطلاعات پروژه را کامل کن تا برای بررسی ارسال شود.</p><form id="submit-form"><div class="field"><label for="title">نام پروژه</label><input id="title" name="title" minlength="3" maxlength="100" placeholder="مثلاً ربات مدیریت گروه" required></div><div class="field"><label for="category">دسته‌بندی پروژه</label><select id="category" name="category" required><option value="">انتخاب دسته‌بندی</option><option>مدیریت گروه</option><option>ابزار کاربردی</option><option>هوش مصنوعی</option><option>سرگرمی</option><option>فروشگاهی</option><option>سایر</option></select></div><div class="field"><label for="description">معرفی و قابلیت‌ها</label><textarea id="description" name="description" minlength="10" maxlength="2000" placeholder="این پروژه چه کاری انجام می‌دهد؟" required></textarea></div><div class="field"><label for="file">فایل ZIP سورس (حداکثر ۵ مگابایت)</label><input id="file" name="file" type="file" accept=".zip,application/zip" required></div><label class="check"><input type="checkbox" name="rights" required> تأیید می‌کنم حق قانونی انتشار این سورس را دارم و محتوای ارسالی ناقض حقوق دیگران نیست.</label><button class="button" type="submit" style="margin-top:18px">ارسال برای بررسی <span>←</span></button><div id="message" role="status"></div></form></section><section class="panel"><h2>درخواست‌های من</h2><div id="submissions" class="muted">در حال بارگذاری…</div></section><section class="panel span2"><h2>اعلان‌ها و به‌روزرسانی‌ها</h2><div id="notifications" class="muted">در حال بارگذاری…</div></section></div></main><script>
-const $=s=>document.querySelector(s);async function api(url,options={}){const r=await fetch(url,options);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"خطا در دریافت اطلاعات");return d}function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-async function init(){try{const me=await api("/api/me");$("#email").textContent=me.user.email;if(["admin","owner"].includes(me.user.role))$("#admin-link").hidden=false;const [subs,notes]=await Promise.all([api("/api/my/submissions"),api("/api/notifications")]);$("#submissions").innerHTML=subs.items.length?subs.items.map(x=>'<div class="item"><b>'+esc(x.title)+'</b><div class="muted">'+esc(x.category)+' · '+new Date(x.created_at).toLocaleDateString("fa-IR")+'</div><div class="status">'+({pending:"در انتظار بررسی",approved:"تأیید و منتشر شد",rejected:"رد شد"}[x.status]||esc(x.status))+'</div>'+(x.review_note?'<div>'+esc(x.review_note)+'</div>':'')+'</div>').join(""):"هنوز درخواستی ثبت نکرده‌ای.";$("#notifications").innerHTML=notes.items.length?notes.items.map(n=>'<div class="item"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small class="muted">'+new Date(n.created_at).toLocaleString("fa-IR")+'</small></div>').join(""):"اعلانی نداری."}catch(e){location.href="/login.html"}}
-$("#submit-form").onsubmit=async e=>{e.preventDefault();const msg=$("#message"),btn=e.submitter;btn.disabled=true;msg.textContent="در حال ارسال…";try{const fd=new FormData(e.currentTarget);const result=await api("/api/submissions",{method:"POST",body:fd});msg.textContent=result.message;e.currentTarget.reset();await init()}catch(err){msg.textContent=err.message}finally{btn.disabled=false}};
-$("#logout").onclick=async()=>{await fetch("/api/auth/logout",{method:"POST"});location.href="/"};init();
-</script></body></html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#183529">
+  <meta name="description" content="فضای شخصی اعضای FXI BotForge">
+  <title>حساب من | FXI BotForge</title>
+  <link rel="stylesheet" href="/styles.css?v=botforge-workspace-20261124">
+</head>
+<body class="page-dashboard">
+  <header class="topbar workspace-topbar">
+    <a class="brand" href="/"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a>
+    <div class="workspace-nav"><a class="text-link" href="/">کتابخانه سورس‌ها</a><a class="text-link" id="admin-link" href="/admin.html" hidden>مرکز مدیریت ↗</a><button id="logout" class="quiet-button" type="button">خروج از حساب ↗</button></div>
+  </header>
+
+  <main class="dash workspace">
+    <section class="workspace-hero user-hero">
+      <div class="workspace-hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> YOUR CREATOR SPACE</div>
+        <h1>فضای شخصی تو</h1>
+        <p>پروژه‌هایت را ارسال کن، وضعیت بررسی را ببین و از نتیجه‌ها باخبر شو.</p>
+        <div class="workspace-identity"><span class="identity-avatar" id="avatar">U</span><span><b id="email">در حال بررسی حساب…</b><small id="role-label">عضو BotForge</small></span></div>
+      </div>
+      <div class="workspace-orbit" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-core">FXI</div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div>
+      <span class="hero-decoration">CREATOR</span>
+    </section>
+
+    <div id="page-message" class="workspace-message" role="status" aria-live="polite">در حال اتصال به فضای شخصی…</div>
+    <section class="stats workspace-stats user-stats">
+      <article class="stat"><span>کل درخواست‌ها</span><strong id="total-count">—</strong><small>پروژه‌های ارسال‌شده</small></article>
+      <article class="stat"><span>در انتظار بررسی</span><strong id="pending-count">—</strong><small>در صف مدیران</small></article>
+      <article class="stat"><span>تأییدشده‌ها</span><strong id="approved-count">—</strong><small>منتشرشده در کتابخانه</small></article>
+    </section>
+
+    <div class="dash-grid workspace-grid">
+      <section class="panel workspace-panel upload-panel">
+        <div class="panel-heading"><div><span class="eyebrow">NEW SUBMISSION</span><h2>ارسال پروژه جدید</h2><p class="panel-subtitle">سورس را همراه توضیحات بفرست تا برای انتشار بررسی شود.</p></div><span class="panel-mark">＋</span></div>
+        <form id="submit-form" enctype="multipart/form-data">
+          <div class="field"><label for="title">نام پروژه</label><input id="title" name="title" minlength="3" maxlength="100" placeholder="مثلاً ربات مدیریت گروه" required></div>
+          <div class="field"><label for="category">دسته‌بندی</label><select id="category" name="category" required><option value="">انتخاب دسته‌بندی</option><option>مدیریت گروه</option><option>ابزار کاربردی</option><option>هوش مصنوعی</option><option>سرگرمی</option><option>فروشگاهی</option><option>سایر</option></select></div>
+          <div class="field"><label for="description">معرفی و قابلیت‌ها</label><textarea id="description" name="description" minlength="10" maxlength="2000" placeholder="پروژه چه مشکلی را حل می‌کند؟ قابلیت‌های اصلی و روش اجرا را بنویس…" required></textarea><small class="field-hint">حداقل ۱۰ و حداکثر ۲۰۰۰ کاراکتر</small></div>
+          <div class="field"><label for="file">فایل ZIP سورس</label><input id="file" name="file" type="file" accept=".zip,application/zip" required><small class="field-hint">حداکثر ۵ مگابایت · فقط فایل ZIP معتبر</small></div>
+          <label class="check"><input type="checkbox" name="rights" required><span>تأیید می‌کنم حق قانونی انتشار این سورس را دارم و فایل ارسالی حاوی اطلاعات محرمانه، رمز عبور یا توکن شخصی نیست.</span></label>
+          <button class="button submit-wide" id="submit-button" type="submit">ارسال برای بررسی <span>←</span></button>
+          <div id="form-message" class="inline-message" role="status" aria-live="polite"></div>
+        </form>
+      </section>
+
+      <section class="panel workspace-panel">
+        <div class="panel-heading"><div><span class="eyebrow">PROJECT TRACKER</span><h2>درخواست‌های من</h2><p class="panel-subtitle">آخرین وضعیت پروژه‌های ارسالی.</p></div><span class="panel-mark">01</span></div>
+        <div id="submissions" class="data-list"><div class="skeleton-row"></div><div class="skeleton-row"></div></div>
+      </section>
+
+      <section class="panel workspace-panel span2">
+        <div class="panel-heading"><div><span class="eyebrow">NOTIFICATIONS</span><h2>اعلان‌ها و به‌روزرسانی‌ها</h2><p class="panel-subtitle">نتیجه بررسی‌ها و خبرهای مربوط به حساب تو.</p></div><span class="panel-mark">02</span></div>
+        <div id="notifications" class="notification-list"><div class="skeleton-row"></div></div>
+      </section>
+    </div>
+  </main>
+  <footer class="workspace-footer"><a class="brand" href="/"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a><span>هر پروژه خوب، از یک قدم شروع می‌شود.</span></footer>
+
+<script>
+(() => {
+  const $ = selector => document.querySelector(selector);
+  let currentUser = null;
+  let submissions = [];
+  function esc(value) { return String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" })[c]); }
+  function fmt(value, time = true) {
+    const date = new Date(value);
+    return !value || Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("fa-IR", time ? { dateStyle:"medium",timeStyle:"short" } : { dateStyle:"medium" });
+  }
+  function faNumber(value) { return new Intl.NumberFormat("fa-IR").format(Number(value) || 0); }
+  function showMessage(target, text, type = "info") { const el = $(target); el.textContent = text; el.dataset.type = type; el.hidden = !text; }
+  async function api(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (options.body && !(options.body instanceof FormData) && !headers.has("content-type")) headers.set("content-type", "application/json");
+    headers.set("accept", "application/json");
+    const response = await fetch(url, { credentials:"same-origin", cache:"no-store", ...options, headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { const error = new Error(data.error || "درخواست ناموفق بود."); error.status = response.status; throw error; }
+    return data;
+  }
+  function statusInfo(status) {
+    return ({ pending:["در انتظار بررسی","pending"], approved:["تأیید و منتشر شد","approved"], rejected:["رد شده","rejected"] })[status] || [status,"pending"];
+  }
+  function renderSubmissions() {
+    $("#submissions").innerHTML = submissions.length ? submissions.map(item => {
+      const [label, cls] = statusInfo(item.status);
+      return '<article class="tracker-item"><div class="tracker-top"><b>' + esc(item.title) + '</b><span class="status-chip ' + cls + '">' + label + '</span></div><small>' + esc(item.category) + ' · ' + fmt(item.created_at, false) + ' · ' + faNumber((item.file_size / 1024).toFixed(1)) + ' KB</small>' + (item.review_note ? '<p class="review-note">' + esc(item.review_note) + '</p>' : '') + '</article>';
+    }).join("") : '<div class="empty-state"><span>⌘</span><b>هنوز پروژه‌ای نفرستادی</b><small>اولین پروژه‌ات را از فرم کناری ارسال کن.</small></div>';
+    $("#total-count").textContent = faNumber(submissions.length);
+    $("#pending-count").textContent = faNumber(submissions.filter(item => item.status === "pending").length);
+    $("#approved-count").textContent = faNumber(submissions.filter(item => item.status === "approved").length);
+  }
+  async function loadSubmissions() {
+    const data = await api("/api/my/submissions");
+    submissions = Array.isArray(data.items) ? data.items : [];
+    renderSubmissions();
+  }
+  async function loadNotifications() {
+    const data = await api("/api/notifications");
+    $("#notifications").innerHTML = data.items.length ? data.items.map(item => '<article class="notification-item ' + (item.read_at ? "is-read" : "is-unread") + '"><span class="notification-symbol">' + (item.type === "success" ? "✓" : item.type === "warning" ? "!" : "✧") + '</span><div class="notification-copy"><b>' + esc(item.title) + '</b><p>' + esc(item.body) + '</p><small>' + fmt(item.created_at) + '</small></div>' + (!item.read_at ? '<button class="mark-read" data-read="' + esc(item.id) + '" type="button">خواندم</button>' : '<span class="read-label">خوانده‌شده</span>') + '</article>').join("") : '<div class="empty-state"><span>✧</span><b>اعلان تازه‌ای نداری</b><small>نتیجه بررسی پروژه‌ها در همین بخش نمایش داده می‌شود.</small></div>';
+  }
+  async function init() {
+    showMessage("#page-message", "در حال بررسی نشست و دریافت اطلاعات…");
+    try {
+      const me = await api("/api/me");
+      currentUser = me.user;
+      $("#email").textContent = currentUser.email;
+      $("#avatar").textContent = currentUser.role === "owner" ? "O" : currentUser.role === "admin" ? "M" : "U";
+      $("#role-label").textContent = currentUser.role === "owner" ? "مالک اصلی BotForge" : currentUser.role === "admin" ? "مدیر BotForge" : "عضو BotForge";
+      if (["admin","owner"].includes(currentUser.role)) $("#admin-link").hidden = false;
+      const results = await Promise.allSettled([loadSubmissions(), loadNotifications()]);
+      const failed = results.some(result => result.status === "rejected");
+      showMessage("#page-message", failed ? "حساب فعال است، اما بارگذاری بخشی از اطلاعات ناموفق بود. صفحه را دوباره بارگذاری کن." : "خوش آمدی؛ فضای شخصی تو آماده است.", failed ? "warning" : "success");
+    } catch (error) {
+      if (error.status === 401) { location.replace("/login.html"); return; }
+      showMessage("#page-message", error.message || "ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کن.", "error");
+    }
+  }
+  $("#submit-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $("#submit-button");
+    const file = $("#file").files[0];
+    if (!file) { showMessage("#form-message", "فایل ZIP را انتخاب کن.", "error"); return; }
+    if (!file.name.toLowerCase().endsWith(".zip") || file.size < 4 || file.size > 5 * 1024 * 1024) { showMessage("#form-message", "فقط فایل ZIP معتبر با حجم حداکثر ۵ مگابایت پذیرفته می‌شود.", "error"); return; }
+    button.disabled = true;
+    button.textContent = "در حال ارسال فایل…";
+    showMessage("#form-message", "فایل در حال ارسال امن برای بررسی است…");
+    try {
+      const result = await api("/api/submissions", { method:"POST", body:new FormData(form) });
+      showMessage("#form-message", result.message || "پروژه با موفقیت ارسال شد.", "success");
+      form.reset();
+      await loadSubmissions();
+    } catch (error) { showMessage("#form-message", error.message, "error"); }
+    finally { button.disabled = false; button.innerHTML = 'ارسال برای بررسی <span>←</span>'; }
+  });
+  $("#notifications").addEventListener("click", async event => {
+    const button = event.target.closest("[data-read]");
+    if (!button) return;
+    button.disabled = true;
+    try { await api("/api/notifications/" + encodeURIComponent(button.dataset.read) + "/read", { method:"POST" }); await loadNotifications(); }
+    catch (error) { button.disabled = false; showMessage("#page-message", error.message, "error"); }
+  });
+  $("#logout").addEventListener("click", async () => {
+    const button = $("#logout");
+    button.disabled = true;
+    try { await api("/api/auth/logout", { method:"POST" }); location.replace("/"); }
+    catch (error) { button.disabled = false; showMessage("#page-message", error.message, "error"); }
+  });
+  init();
+})();
+</script>
+</body>
+</html>
