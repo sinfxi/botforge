@@ -23,8 +23,8 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 4. Apply the migration: `npx wrangler d1 migrations apply fxi-botforge-db --local`.
 5. Create a local `.dev.vars` file (never commit it):
    ```
-   BOOTSTRAP_OWNER_EMAIL=you@example.com
-   BOOTSTRAP_OWNER_PASSWORD=use-a-long-unique-password
+   BOOTSTRAP_OWNER_USERNAME=adminfxi
+   BOOTSTRAP_OWNER_PASSWORD=your-owner-password
    ```
 6. Start the app: `npx wrangler dev`.
 
@@ -32,9 +32,9 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 1. Create a D1 database named `fxi-botforge-db` and a Workers KV namespace named `fxi-botforge-files`.
 2. Confirm the D1 database ID and KV namespace ID in `wrangler.toml` match your Cloudflare account.
 3. Run `npx wrangler d1 migrations apply fxi-botforge-db --remote`.
-4. Add Worker secrets `BOOTSTRAP_OWNER_EMAIL` and `BOOTSTRAP_OWNER_PASSWORD` in Worker Settings → Variables and Secrets. Use a unique password; do not put secrets in GitHub.
+4. Add Worker secrets `BOOTSTRAP_OWNER_USERNAME` and `BOOTSTRAP_OWNER_PASSWORD` in Worker Settings → Variables and Secrets. Do not put secrets in GitHub.
 5. Deploy the Worker with `npx wrangler deploy` (or connect the repository through Workers Builds).
-6. Open `/setup-owner.html` once, create the owner account using the exact email/password configured as secrets, then sign in at `/login.html`. The bootstrap endpoint permanently closes after an owner/admin exists.
+6. Open `/setup-owner.html` once, create the owner account using the exact username/password configured as secrets, then sign in at `/login.html` using the generated 4-digit public user ID, username, and password. The bootstrap endpoint permanently closes after an owner/admin exists.
 7. Check `/api/health`; it should report database connected and storage configured.
 
 ## Routes
