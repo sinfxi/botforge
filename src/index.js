@@ -183,6 +183,20 @@ async function handleApi(request, env, url) {
     return user ? json({ user }) : json({ user: null }, 401);
   }
 
+  if (path === "/api/public/stats" && method === "GET") {
+    try {
+      const [projects, creators, downloads] = await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE status='published'").first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE status='active'").first(),
+        env.DB.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action='bot.download'").first()
+      ]);
+      return json({ projects:Number(projects?.count || 0), creators:Number(creators?.count || 0), downloads:Number(downloads?.count || 0), updated_at:now() }, 200, { "cache-control":"public, max-age=0, s-maxage=15, stale-while-revalidate=30" });
+    } catch (error) {
+      console.error("Public stats failed:", error);
+      return json({ error:"آمار عمومی موقتاً در دسترس نیست." }, 503);
+    }
+  }
+
   if (path === "/api/bots" && method === "GET") {
     const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
     return json({ items: results || [] }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
