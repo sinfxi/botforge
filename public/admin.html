@@ -25,7 +25,7 @@
         <p>نمایی یکپارچه از فعالیت‌ها، اعضا و کیفیت کتابخانه سورس‌ها.</p>
         <div class="workspace-identity">
           <span class="identity-avatar">F</span>
-          <span><b id="account-email">در حال بررسی حساب…</b><small id="account-role">در حال دریافت سطح دسترسی</small></span>
+          <span><b id="account-username">در حال بررسی حساب…</b><small id="account-role">در حال دریافت سطح دسترسی</small><small id="account-id">شناسه: در حال دریافت…</small></span>
         </div>
       </div>
       <div class="workspace-orbit" aria-hidden="true"><div class="orbit-ring ring-one"></div><div class="orbit-ring ring-two"></div><div class="orbit-core">FXI</div><span class="orbit-dot dot-one"></span><span class="orbit-dot dot-two"></span></div>
@@ -57,7 +57,7 @@
       <form id="manager-form" class="manager-form">
         <div class="form-intro"><span class="form-icon">＋</span><div><b>افزودن مدیر جدید</b><small>حساب مدیر با نقش محدود ساخته می‌شود.</small></div></div>
         <div class="manager-fields">
-          <div class="field"><label for="manager-email">ایمیل مدیر</label><input id="manager-email" type="email" autocomplete="email" maxlength="254" required placeholder="manager@example.com"></div>
+          <div class="field"><label for="manager-username">نام کاربری مدیر</label><input id="manager-username" type="text" autocomplete="username" minlength="3" maxlength="24" required pattern="[A-Za-z0-9_]+" placeholder="manager_name"></div>
           <div class="field"><label for="manager-password">رمز عبور اولیه</label><input id="manager-password" type="password" minlength="12" maxlength="200" required autocomplete="new-password" placeholder="حداقل ۱۲ کاراکتر"></div>
         </div>
         <div class="permission-grid">
@@ -134,12 +134,12 @@
     const data = await api("/api/admin/submissions");
     $("#queue").innerHTML = data.items.length ? data.items.map(item => {
       const pending = item.status === "pending";
-      return '<article class="data-row submission-row"><div class="row-main"><span class="row-icon">⌘</span><div class="row-copy"><b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.category) + ' · ' + escapeHtml(item.uploader_email) + ' · ' + number((item.file_size / 1024).toFixed(1)) + ' KB</small><p>' + escapeHtml(item.description) + '</p><small>' + escapeHtml(item.original_filename) + ' · ' + date(item.created_at) + '</small></div></div>' + (pending ? '<div class="row-actions"><button class="action-button approve" data-review="approve" data-id="' + escapeHtml(item.id) + '">تأیید و انتشار</button><button class="action-button reject" data-review="reject" data-id="' + escapeHtml(item.id) + '">رد درخواست</button></div>' : '<span class="status-chip">' + (item.status === "approved" ? "منتشر شده" : "رد شده") + '</span>') + '</article>';
+      return '<article class="data-row submission-row"><div class="row-main"><span class="row-icon">⌘</span><div class="row-copy"><b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.category) + ' · ' + escapeHtml(item.uploader_username) + ' · ' + number((item.file_size / 1024).toFixed(1)) + ' KB</small><p>' + escapeHtml(item.description) + '</p><small>' + escapeHtml(item.original_filename) + ' · ' + date(item.created_at) + '</small></div></div>' + (pending ? '<div class="row-actions"><button class="action-button approve" data-review="approve" data-id="' + escapeHtml(item.id) + '">تأیید و انتشار</button><button class="action-button reject" data-review="reject" data-id="' + escapeHtml(item.id) + '">رد درخواست</button></div>' : '<span class="status-chip">' + (item.status === "approved" ? "منتشر شده" : "رد شده") + '</span>') + '</article>';
     }).join("") : '<div class="empty-state"><span>✧</span><b>صف بررسی خالی است</b><small>در حال حاضر درخواست جدیدی وجود ندارد.</small></div>';
   }
   async function loadUsers() {
     const data = await api("/api/admin/users");
-    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.email) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" && me.user.role !== "owner" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
+    $("#users-list").innerHTML = data.items.length ? data.items.map(user => '<article class="data-row"><div class="row-main"><span class="row-icon">◎</span><div class="row-copy"><b>' + escapeHtml(user.username) + '</b><small>' + escapeHtml(user.role === "owner" ? "مالک اصلی" : user.role === "admin" ? "مدیر" : "عضو") + ' · ' + date(user.created_at, false) + '</small></div></div><div class="row-actions">' + (user.role === "owner" ? '<span class="owner-pill">مالک</span>' : user.role === "admin" && me.user.role !== "owner" ? '<span class="status-chip">مدیر · فقط مالک قابل تغییر</span>' : user.status === "active" ? '<button class="action-button reject" data-user-action="suspend" data-id="' + escapeHtml(user.id) + '">تعلیق حساب</button>' : '<button class="action-button approve" data-user-action="activate" data-id="' + escapeHtml(user.id) + '">فعال‌سازی</button>') + '</div></article>').join("") : '<div class="empty-state"><span>◎</span><b>هنوز عضوی ثبت نشده</b></div>';
   }
   async function loadBots() {
     const data = await api("/api/admin/bots");
@@ -147,12 +147,12 @@
   }
   async function loadAudit() {
     const data = await api("/api/admin/audit");
-    $("#audit").innerHTML = data.items.length ? data.items.map(item => '<article class="data-row"><span class="timeline-dot"></span><div class="row-copy"><b>' + escapeHtml(item.action) + '</b><small>' + escapeHtml(item.actor_email || "سیستم") + ' · ' + date(item.created_at) + '</small>' + (item.target_type ? '<small>موضوع: ' + escapeHtml(item.target_type) + (item.target_id ? ' · ' + escapeHtml(item.target_id) : '') + '</small>' : '') + '</div></article>').join("") : '<div class="empty-state"><span>✧</span><b>گزارشی ثبت نشده است</b></div>';
+    $("#audit").innerHTML = data.items.length ? data.items.map(item => '<article class="data-row"><span class="timeline-dot"></span><div class="row-copy"><b>' + escapeHtml(item.action) + '</b><small>' + escapeHtml(item.actor_username || "سیستم") + ' · ' + date(item.created_at) + '</small>' + (item.target_type ? '<small>موضوع: ' + escapeHtml(item.target_type) + (item.target_id ? ' · ' + escapeHtml(item.target_id) : '') + '</small>' : '') + '</div></article>').join("") : '<div class="empty-state"><span>✧</span><b>گزارشی ثبت نشده است</b></div>';
   }
   async function loadManagers() {
     const data = await api("/api/admin/managers");
     $("#manager-count").textContent = number(data.items.length) + " مدیر";
-    $("#manager-list").innerHTML = data.items.length ? data.items.map(manager => '<details class="manager-card"><summary><span class="manager-avatar">M</span><span class="manager-summary"><b>' + escapeHtml(manager.email) + '</b><small>' + (manager.status === "active" ? "حساب فعال" : "حساب تعلیق‌شده") + ' · ' + date(manager.created_at, false) + '</small></span><span class="manager-chevron">⌄</span></summary><div class="manager-edit-body"><p>دسترسی‌های مجاز این مدیر:</p><div class="permission-grid compact">' + permissionKeys.map(key => '<label><input type="checkbox" data-manager-permission="' + key + '"' + (manager.permissions.includes(key) ? ' checked' : '') + '><span><b>' + labels[key] + '</b></span></label>').join("") + '</div><div class="row-actions"><button class="action-button approve" data-manager-save data-id="' + escapeHtml(manager.id) + '">ذخیره دسترسی‌ها</button><button class="action-button reject" data-manager-remove data-id="' + escapeHtml(manager.id) + '">لغو نقش مدیریت</button></div></div></details>').join("") : '<div class="empty-state"><span>＋</span><b>هنوز مدیری اضافه نشده است</b><small>از فرم بالا اولین مدیر را ایجاد کن.</small></div>';
+    $("#manager-list").innerHTML = data.items.length ? data.items.map(manager => '<details class="manager-card"><summary><span class="manager-avatar">M</span><span class="manager-summary"><b>' + escapeHtml(manager.username) + '</b><small>' + (manager.status === "active" ? "حساب فعال" : "حساب تعلیق‌شده") + ' · ' + date(manager.created_at, false) + '</small></span><span class="manager-chevron">⌄</span></summary><div class="manager-edit-body"><p>دسترسی‌های مجاز این مدیر:</p><div class="permission-grid compact">' + permissionKeys.map(key => '<label><input type="checkbox" data-manager-permission="' + key + '"' + (manager.permissions.includes(key) ? ' checked' : '') + '><span><b>' + labels[key] + '</b></span></label>').join("") + '</div><div class="row-actions"><button class="action-button approve" data-manager-save data-id="' + escapeHtml(manager.id) + '">ذخیره دسترسی‌ها</button><button class="action-button reject" data-manager-remove data-id="' + escapeHtml(manager.id) + '">لغو نقش مدیریت</button></div></div></details>').join("") : '<div class="empty-state"><span>＋</span><b>هنوز مدیری اضافه نشده است</b><small>از فرم بالا اولین مدیر را ایجاد کن.</small></div>';
   }
 
   async function load() {
@@ -170,7 +170,8 @@
           return Array.isArray(parsed) ? parsed.filter(key => permissionKeys.includes(key)) : [];
         } catch { return []; }
       })();
-      $("#account-email").textContent = me.user.email;
+      $("#account-username").textContent = me.user.username;
+      $("#account-id").textContent = "شناسه: " + me.user.id;
       $("#account-role").textContent = isOwner ? "مالک اصلی · دسترسی کامل" : "مدیر محدود · دسترسی بر اساس مجوز";
       $(".identity-avatar").textContent = isOwner ? "O" : "M";
       showSection("manager-panel", isOwner);
@@ -207,7 +208,7 @@
     button.disabled = true;
     $("#manager-message").textContent = "در حال ایجاد حساب مدیر…";
     try {
-      await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ email:$("#manager-email").value.trim(), password:$("#manager-password").value, permissions }) });
+      await api("/api/admin/managers", { method:"POST", body:JSON.stringify({ username:$("#manager-username").value.trim(), password:$("#manager-password").value, permissions }) });
       $("#manager-message").textContent = "حساب مدیر ساخته شد. اطلاعات ورود را امن در اختیارش قرار بده.";
       event.currentTarget.reset();
       await loadManagers();
