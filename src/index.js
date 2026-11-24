@@ -113,7 +113,10 @@ async function handleApi(request, env, url) {
       return json({ ok: true, message: "حساب ساخته شد. حالا وارد شو." }, 201);
     } catch (error) {
       console.error("Registration failed:", error);
-      return json({ error: "این ایمیل قبلاً ثبت شده یا ذخیره حساب با مشکل روبه‌رو شده است." }, 409);
+      if (/UNIQUE constraint failed/i.test(String(error?.message || error))) {
+        return json({ error: "این ایمیل قبلاً ثبت شده است. وارد حساب شو یا از ایمیل دیگری استفاده کن." }, 409);
+      }
+      return json({ error: "ذخیره حساب در پایگاه داده ناموفق بود. چند لحظه بعد دوباره تلاش کن." }, 500);
     }
   }
 
