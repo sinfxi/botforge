@@ -37,7 +37,7 @@ async function currentUser(request, env) {
   const token = readCookie(request, "fxi_session");
   if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT users.id, users.email, users.role, users.status, users.permissions_json FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
+    "SELECT users.id, users.username, users.role, users.status, users.permissions_json FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?"
   ).bind(await sha256(token), now()).first();
   return row && row.status === "active" ? row : null;
 }
@@ -85,54 +85,43 @@ async function handleApi(request, env, url) {
 
   if (path === "/api/auth/bootstrap" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
-    if (!env.BOOTSTRAP_OWNER_EMAIL || !env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "تنظیمات اولیه مالک روی سرور تعریف نشده است." }, 503);
+    if (!env.BOOTSTRAP_OWNER_USERNAME || !env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "Secretهای BOOTSTRAP_OWNER_USERNAME و BOOTSTRAP_OWNER_PASSWORD را تنظیم کن." }, 503);
     const existing = await env.DB.prepare("SELECT id FROM users WHERE role IN ('owner','admin') LIMIT 1").first();
     if (existing) return json({ error: "حساب مدیر قبلاً ساخته شده است." }, 409);
-    const body = await request.json().catch(() => null);
-    const email = safeText(body?.email, 254).toLowerCase();
-    const password = typeof body?.password === "string" ? body.password : "";
-    if (email !== env.BOOTSTRAP_OWNER_EMAIL.toLowerCase() || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "اطلاعات راه‌اندازی صحیح نیست." }, 401);
-    const salt = id();
-    const userId = id();
-    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,role) VALUES (?,?,?,?, 'owner')")
-      .bind(userId, email, await passwordHash(password, salt), salt).run();
+    const body = await request.json().catch(() => null), username = safeText(body?.username, 24).toLowerCase(), password = typeof body?.password === "string" ? body.password : "";
+    if (!/^[a-z0-9_]{3,24}$/.test(username) || username !== env.BOOTSTRAP_OWNER_USERNAME.toLowerCase() || password !== env.BOOTSTRAP_OWNER_PASSWORD) return json({ error: "نام کاربری یا رمز راه‌اندازی صحیح نیست." }, 401);
+    const salt = id(), userId = id();
+    await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt,role) VALUES (?,?,?,?,?, 'owner')").bind(userId, username + "@accounts.botforge.invalid", username, await passwordHash(password, salt), salt).run();
     await audit(env, userId, "owner.bootstrap", "user", userId);
-    return json({ ok: true, message: "حساب مالک ساخته شد؛ اکنون وارد شوید." }, 201);
+    return json({ ok: true, user_id: userId, message: "حساب مالک ساخته شد؛ اکنون وارد شوید." }, 201);
   }
-
   if (path === "/api/auth/register" && method === "POST") {
-    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است. صفحه را از آدرس اصلی سایت باز و دوباره امتحان کن." }, 403);
+    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "ایمیل و رمز عبور را کامل وارد کن." }, 400);
-    const email = body.email.trim().toLowerCase();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || body.password.length < 10 || body.password.length > 200) return json({ error: "ایمیل معتبر و رمز عبور حداقل ۱۰ کاراکتری وارد کن." }, 400);
-    const salt = id();
+    if (!body || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "نام کاربری و رمز عبور را کامل وارد کن." }, 400);
+    const username = body.username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(username) || body.password.length < 10 || body.password.length > 200) return json({ error: "نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد؛ رمز حداقل ۱۰ کاراکتر باشد." }, 400);
+    const salt = id(), userId = id();
     try {
-      await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt) VALUES (?,?,?,?)")
-        .bind(id(), email, await passwordHash(body.password, salt), salt).run();
-      return json({ ok: true, message: "حساب ساخته شد. حالا وارد شو." }, 201);
+      await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt) VALUES (?,?,?,?,?)").bind(userId, username + "@accounts.botforge.invalid", username, await passwordHash(body.password, salt), salt).run();
+      return json({ ok: true, user_id: userId, username, message: "حساب ساخته شد. حالا وارد شو." }, 201);
     } catch (error) {
       console.error("Registration failed:", error);
-      if (/UNIQUE constraint failed/i.test(String(error?.message || error))) {
-        return json({ error: "این ایمیل قبلاً ثبت شده است. وارد حساب شو یا از ایمیل دیگری استفاده کن." }, 409);
-      }
-      return json({ error: "ذخیره حساب در پایگاه داده ناموفق بود. چند لحظه بعد دوباره تلاش کن." }, 500);
+      if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این نام کاربری قبلاً ثبت شده است." }, 409);
+      return json({ error: "ذخیره حساب در پایگاه داده ناموفق بود. اتصال پایگاه داده را بررسی کن." }, 500);
     }
   }
-
   if (path === "/api/auth/login" && method === "POST") {
-    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است. صفحه را از آدرس اصلی سایت باز و دوباره امتحان کن." }, 403);
+    if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.email !== "string" || typeof body.password !== "string") return json({ error: "ایمیل و رمز عبور را کامل وارد کن." }, 400);
-    const email = body.email.trim().toLowerCase();
-    if (email.length > 254 || body.password.length > 200) return json({ error: "اطلاعات ورود معتبر نیست." }, 400);
-    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE email = ?")
-      .bind(email).first();
-    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "ایمیل یا رمز عبور اشتباه است. اگر هنوز حساب نساخته‌ای، ابتدا ثبت‌نام کن." }, 401);
+    if (!body || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "نام کاربری و رمز عبور را کامل وارد کن." }, 400);
+    const username = body.username.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "نام کاربری یا رمز عبور معتبر نیست." }, 400);
+    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status FROM users WHERE username = ?").bind(username).first();
+    if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "نام کاربری یا رمز عبور اشتباه است." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
-    await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)")
-      .bind(id(), user.id, await sha256(token), new Date(Date.now() + days * 86400000).toISOString()).run();
+    await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,expires_at) VALUES (?,?,?,?)").bind(id(), user.id, await sha256(token), new Date(Date.now() + days * 86400000).toISOString()).run();
     return json({ ok: true }, 200, { "set-cookie": cookie("fxi_session", token, days * 86400) });
   }
 
@@ -224,31 +213,31 @@ async function handleApi(request, env, url) {
     if (path === "/api/admin/managers" || managerRoute) {
       if (admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند مدیران را مدیریت کند." }, 403);
       if (path === "/api/admin/managers" && method === "GET") {
-        const { results } = await env.DB.prepare("SELECT id,email,status,permissions_json,created_at FROM users WHERE role='admin' ORDER BY created_at DESC").all();
+        const { results } = await env.DB.prepare("SELECT id,username,status,permissions_json,created_at FROM users WHERE role='admin' ORDER BY created_at DESC").all();
         return json({ items: (results || []).map(u => ({...u, permissions: safePermissions(u.permissions_json)})) });
       }
       if (path === "/api/admin/managers" && method === "POST") {
         if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
         const body = await request.json().catch(() => null);
-        const email = safeText(body?.email, 254).toLowerCase();
+        const username = safeText(body?.username, 24).toLowerCase();
         const password = typeof body?.password === "string" ? body.password : "";
         const allowed = ["submissions","users","bots","audit"];
         const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "ایمیل معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
+        if (!/^[a-z0-9_]{3,24}$/.test(username) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "نام کاربری معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
         const salt = id(), managerId = id();
         try {
-          await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?, 'admin', ?)").bind(managerId,email,await passwordHash(password,salt),salt,JSON.stringify(permissions)).run();
+          await env.DB.prepare("INSERT INTO users (id,email,username,password_hash,password_salt,role,permissions_json) VALUES (?,?,?,?,?,?,?)").bind(managerId,username + "@accounts.botforge.invalid",username,await passwordHash(password,salt),salt,"admin",JSON.stringify(permissions)).run();
         } catch (error) {
           console.error("Manager creation failed:", error);
-          if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این ایمیل قبلاً در BotForge ثبت شده است." }, 409);
+          if (/UNIQUE constraint failed/i.test(String(error?.message || error))) return json({ error: "این نام کاربری قبلاً در BotForge ثبت شده است." }, 409);
           return json({ error: "ساخت حساب مدیر در پایگاه داده ناموفق بود. دوباره تلاش کن." }, 500);
         }
-        await audit(env,admin.user.id,"manager.create","user",managerId,{email,permissions});
-        return json({ok:true,id:managerId},201);
+        await audit(env,admin.user.id,"manager.create","user",managerId,{username,permissions});
+        return json({ok:true,id:managerId,username},201);
       }
       if (managerRoute && managerRoute[1] && managerRoute[2] === "permissions" && method === "POST") {
         if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
-        const target=await env.DB.prepare("SELECT id,email FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
+        const target=await env.DB.prepare("SELECT id,username FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
         if (!target) return json({error:"مدیر پیدا نشد."},404);
         const body=await request.json().catch(()=>null), allowed=["submissions","users","bots","audit"];
         const permissions=Array.isArray(body?.permissions)?[...new Set(body.permissions.filter(p=>allowed.includes(p)))]:[];
@@ -263,7 +252,7 @@ async function handleApi(request, env, url) {
         if (!target) return json({error:"مدیر پیدا نشد."},404);
         await env.DB.prepare("UPDATE users SET role='user',permissions_json=NULL,updated_at=? WHERE id=? AND role='admin'").bind(now(),target.id).run();
         await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
-        await audit(env,admin.user.id,"manager.remove","user",target.id,{email:target.email});
+        await audit(env,admin.user.id,"manager.remove","user",target.id,{username:target.username});
         return json({ok:true});
       }
       return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
@@ -290,7 +279,7 @@ async function handleApi(request, env, url) {
       return json(result);
     }
     if (path === "/api/admin/submissions" && method === "GET") {
-      const { results } = await env.DB.prepare("SELECT s.id,s.title,s.description,s.category,s.original_filename,s.file_size,s.status,s.created_at,u.email AS uploader_email FROM submissions s JOIN users u ON u.id=s.user_id ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END,s.created_at DESC LIMIT 100").all();
+      const { results } = await env.DB.prepare("SELECT s.id,s.title,s.description,s.category,s.original_filename,s.file_size,s.status,s.created_at,u.username AS uploader_username FROM submissions s JOIN users u ON u.id=s.user_id ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END,s.created_at DESC LIMIT 100").all();
       return json({ items: results || [] });
     }
     const review = path.match(/^\/api\/admin\/submissions\/([0-9a-f-]+)\/(approve|reject)$/i);
@@ -329,21 +318,21 @@ async function handleApi(request, env, url) {
       return json({ ok: true, slug });
     }
     if (path === "/api/admin/users" && method === "GET") {
-      const { results } = await env.DB.prepare("SELECT id,email,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
+      const { results } = await env.DB.prepare("SELECT id,username,role,status,created_at FROM users ORDER BY created_at DESC LIMIT 200").all();
       return json({ items: results || [] });
     }
     const userStatus = path.match(/^\/api\/admin\/users\/([0-9a-f-]+)\/(suspend|activate)$/i);
     if (userStatus && method === "POST") {
       if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
       if (userStatus[1] === admin.user.id) return json({ error: "نمی‌توانی حساب خودت را غیرفعال کنی." }, 400);
-      const target = await env.DB.prepare("SELECT id,email,role FROM users WHERE id=?").bind(userStatus[1]).first();
+      const target = await env.DB.prepare("SELECT id,username,role FROM users WHERE id=?").bind(userStatus[1]).first();
       if (!target) return json({ error: "کاربر پیدا نشد." }, 404);
       if (target.role === "owner" && admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند حساب مالک را تغییر دهد." }, 403);
       if (target.role === "admin" && admin.user.role !== "owner") return json({ error: "مدیران فقط توسط مالک اصلی قابل مدیریت هستند." }, 403);
       const status = userStatus[2].toLowerCase() === "suspend" ? "suspended" : "active";
       await env.DB.prepare("UPDATE users SET status=?,updated_at=? WHERE id=?").bind(status, now(), target.id).run();
       if (status === "suspended") await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
-      await audit(env, admin.user.id, "user." + status, "user", target.id, { email: target.email });
+      await audit(env, admin.user.id, "user." + status, "user", target.id, { username: target.username });
       return json({ ok: true, status });
     }
     if (path === "/api/admin/bots" && method === "GET") {
@@ -361,7 +350,7 @@ async function handleApi(request, env, url) {
       return json({ ok: true });
     }
     if (path === "/api/admin/audit" && method === "GET") {
-      const { results } = await env.DB.prepare("SELECT a.id,a.action,a.target_type,a.target_id,a.details_json,a.created_at,u.email AS actor_email FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 100").all();
+      const { results } = await env.DB.prepare("SELECT a.id,a.action,a.target_type,a.target_id,a.details_json,a.created_at,u.username AS actor_username FROM audit_logs a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 100").all();
       return json({ items: results || [] });
     }
     return json({ error: "مسیر مدیریت پیدا نشد." }, 404);
