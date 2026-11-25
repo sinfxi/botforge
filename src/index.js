@@ -104,8 +104,8 @@ async function handleTelegramWebhook(request, env) {
   if (request.headers.get("x-telegram-bot-api-secret-token") !== env.TELEGRAM_WEBHOOK_SECRET) return json({error:"Unauthorized"},401);
   const update = await request.json().catch(() => null);
   const message = update?.message, chatId = message?.chat?.id, chatType = message?.chat?.type || "", from = message?.from;
-  const textValue = typeof message?.text === "string" ? message.text.trim() : "";
-  if (!chatId || !from || !textValue) return json({ok:true});
+  const textValue = typeof message?.text === "string" ? message.text.trim() : typeof message?.caption === "string" ? message.caption.trim() : "";
+  if (!chatId || !from || (!textValue && !message?.document)) return json({ok:true});
   const parts = textValue.split(/\s+/, 2), commandName = (parts[0] || "").toLowerCase().split("@")[0];
 
   if (commandName === "/connect") {
@@ -135,6 +135,7 @@ async function handleTelegramWebhook(request, env) {
     const setState = async (state,payload=null) => env.DB.prepare("INSERT INTO telegram_bot_states(telegram_user_id,state,payload_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_user_id) DO UPDATE SET state=excluded.state,payload_json=excluded.payload_json,updated_at=excluded.updated_at")
       .bind(String(from.id),state,payload?JSON.stringify(payload):null,now()).run();
     const clearState = async () => env.DB.prepare("DELETE FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).run();
+    await env.DB.prepare("DELETE FROM telegram_bot_states WHERE telegram_user_id=? AND updated_at<?").bind(String(from.id),new Date(Date.now()-30*60*1000).toISOString()).run();
     const stateRow = await env.DB.prepare("SELECT state,payload_json FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).first();
     const state = stateRow?.state || "";
     let statePayload = {};
@@ -145,6 +146,71 @@ async function handleTelegramWebhook(request, env) {
       if (!linkedAccount) { await sendHome(); return json({ok:true}); }
     }
     if (linkedAccount && linkedAccount.status === "active") {
+      if (state && ["لغو","انصراف"].includes(userAction)) { await clearState(); await telegramSend(env,chatId,"عملیات لغو شد.",menuKeyboard); return json({ok:true}); }
+      if (commandName === "/submit" || userAction === "📤 ارسال پروژه") {
+        await setState("submission_title");
+        await telegramSend(env,chatId,"📤 ثبت پروژه جدید\n\nابتدا عنوان پروژه را بفرست (۳ تا ۱۰۰ کاراکتر). برای انصراف «لغو» را بفرست.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (state === "submission_title") {
+        const title = safeText(userAction,100);
+        if (title.length < 3) { await telegramSend(env,chatId,"عنوان باید حداقل ۳ کاراکتر باشد. دوباره بفرست."); return json({ok:true}); }
+        await setState("submission_description",{title});
+        await telegramSend(env,chatId,"حالا توضیحات پروژه را بفرست (حداقل ۱۰ و حداکثر ۲۰۰۰ کاراکتر).");
+        return json({ok:true});
+      }
+      if (state === "submission_description") {
+        const description = safeText(userAction,2000);
+        if (description.length < 10) { await telegramSend(env,chatId,"توضیحات باید حداقل ۱۰ کاراکتر باشد. دوباره بفرست."); return json({ok:true}); }
+        await setState("submission_category",{title:statePayload.title,description});
+        await telegramSend(env,chatId,"دسته‌بندی پروژه را بفرست؛ مثلاً Python، ربات تلگرام، ابزار یا وب‌سایت.");
+        return json({ok:true});
+      }
+      if (state === "submission_category") {
+        const category = safeText(userAction,50);
+        if (category.length < 2) { await telegramSend(env,chatId,"دسته‌بندی معتبر نیست؛ دوباره بفرست."); return json({ok:true}); }
+        await setState("submission_rights",{title:statePayload.title,description:statePayload.description,category});
+        await telegramSend(env,chatId,"قبل از ارسال فایل تأیید کن که حق انتشار این محتوا را داری و فایل حاوی بدافزار یا محتوای غیرمجاز نیست.\nبرای تأیید دقیقاً بنویس: «تأیید می‌کنم»");
+        return json({ok:true});
+      }
+      if (state === "submission_rights") {
+        if (userAction !== "تأیید می‌کنم") { await telegramSend(env,chatId,"برای ادامه باید دقیقاً «تأیید می‌کنم» را بفرستی؛ برای انصراف «لغو»."); return json({ok:true}); }
+        await setState("submission_file",statePayload);
+        await telegramSend(env,chatId,"حالا فایل ZIP پروژه را به‌صورت Document بفرست. حداکثر حجم ۵ مگابایت است.");
+        return json({ok:true});
+      }
+      if (state === "submission_file") {
+        const document = message?.document;
+        if (!document) { await telegramSend(env,chatId,"منتظر فایل ZIP هستم. فایل را به‌صورت Document بفرست؛ حداکثر ۵ مگابایت."); return json({ok:true}); }
+        const filename = safeFilename(document.file_name || "source.zip");
+        const fileSize = Number(document.file_size || 0);
+        if (!filename.toLowerCase().endsWith(".zip") || fileSize < 4 || fileSize > (Number(env.MAX_UPLOAD_BYTES)||MAX_UPLOAD)) {
+          await telegramSend(env,chatId,"فقط فایل ZIP با حجم حداکثر ۵ مگابایت پذیرفته می‌شود. فایل دیگری بفرست یا «لغو» کن.");
+          return json({ok:true});
+        }
+        const fileInfo = await fetch("https://api.telegram.org/bot"+env.TELEGRAM_BOT_TOKEN+"/getFile?file_id="+encodeURIComponent(document.file_id)).then(r=>r.json()).catch(()=>null);
+        if (!fileInfo?.ok || !fileInfo.result?.file_path) { await telegramSend(env,chatId,"دریافت فایل از تلگرام ناموفق بود؛ دوباره ارسالش کن."); return json({ok:true}); }
+        const fileResponse = await fetch("https://api.telegram.org/file/bot"+env.TELEGRAM_BOT_TOKEN+"/"+fileInfo.result.file_path);
+        if (!fileResponse.ok) { await telegramSend(env,chatId,"دانلود فایل از تلگرام ناموفق بود؛ دوباره تلاش کن."); return json({ok:true}); }
+        const bytes = await fileResponse.arrayBuffer();
+        if (bytes.byteLength < 4 || bytes.byteLength > (Number(env.MAX_UPLOAD_BYTES)||MAX_UPLOAD)) { await telegramSend(env,chatId,"حجم فایل معتبر نیست یا از ۵ مگابایت بیشتر است."); return json({ok:true}); }
+        const head = new Uint8Array(bytes.slice(0,4));
+        if (!(head[0]===0x50 && head[1]===0x4b && [0x03,0x05,0x07].includes(head[2]) && [0x04,0x06,0x08].includes(head[3]))) { await telegramSend(env,chatId,"ساختار ZIP معتبر نیست. لطفاً فایل ZIP سالم بفرست."); return json({ok:true}); }
+        if (!env.FILES) { await telegramSend(env,chatId,"فضای ذخیره‌سازی فایل موقتاً در دسترس نیست."); return json({ok:true}); }
+        const submissionId = id(), objectKey = "pending/"+linkedAccount.id+"/"+submissionId+".zip";
+        await env.FILES.put(objectKey,bytes);
+        try {
+          await env.DB.prepare("INSERT INTO submissions(id,user_id,title,description,category,object_key,original_filename,file_size,rights_confirmed) VALUES(?,?,?,?,?,?,?,?,1)")
+            .bind(submissionId,linkedAccount.id,statePayload.title,statePayload.description,statePayload.category,objectKey,filename,bytes.byteLength).run();
+        } catch(error) {
+          await env.FILES.delete(objectKey);
+          throw error;
+        }
+        await clearState();
+        await audit(env,linkedAccount.id,"submission.create.telegram","submission",submissionId,{filename,file_size:bytes.byteLength});
+        await telegramSend(env,chatId,"✅ پروژه با موفقیت برای بررسی ارسال شد.\nعنوان: "+safeText(statePayload.title,100)+"\nکد پیگیری: "+submissionId+"\nپس از بررسی، نتیجه را همین‌جا دریافت می‌کنی.",menuKeyboard);
+        return json({ok:true});
+      }
       if (state === "gift_code" && !textValue.startsWith("/")) {
         const code = safeText(textValue,32).toUpperCase().replace(/[^A-Z0-9]/g,"");
         await clearState();
@@ -305,7 +371,8 @@ async function handleTelegramWebhook(request, env) {
       if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
-        await telegramSend(env,chatId,"راهنمای FXI BotForge\n/menu — منوی اصلی\n/account — اطلاعات حساب\n/projects — پروژه‌های منتشرشده تو\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\n/menu — منوی اصلی\n/account — اطلاعات حساب\n/projects — پروژه‌های منتشرشده تو\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/submit — ارسال پروژه ZIP
+/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
         return json({ok:true});
       } else if (userAction === "🔗 قطع اتصال تلگرام") {
         await setState("confirm_unlink");
@@ -894,7 +961,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"account",description:"اطلاعات حساب"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
