@@ -90,8 +90,8 @@ async function notify(env, userId, title, body, type = "info") {
 
 function luckyIdReward(publicId) {
   const d = String(publicId || "");
-  if (!/^\\d{4}$/.test(d)) return null;
-  if (/^(\\d)\\1{3}$/.test(d)) return { pattern: "چهار رقم یکسان", reward: 1000, title: "شناسه افسانه‌ای" };
+  if (!/^\d{4}$/.test(d)) return null;
+  if (/^(\d)\\1{3}$/.test(d)) return { pattern: "چهار رقم یکسان", reward: 1000, title: "شناسه افسانه‌ای" };
   if (d === "1234" || d === "4321" || d === "2345" || d === "5432" || d === "6789" || d === "9876") return { pattern: "ترتیب پیوسته", reward: 400, title: "شناسه ترتیبی" };
   if (d[0] === d[3] && d[1] === d[2]) return { pattern: "قرینه", reward: 300, title: "شناسه آینه‌ای" };
   if (d[0] === d[1] && d[2] === d[3]) return { pattern: "دو جفت", reward: 200, title: "شناسه دوتایی" };
@@ -214,7 +214,7 @@ async function handleApi(request, env, url) {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
     const publicId = normalizeUserId(url.searchParams.get("id"));
-    if (!/^\\d{4}$/.test(publicId)) return json({error:"شناسه باید دقیقاً ۴ رقم باشد."},400);
+    if (!/^\d{4}$/.test(publicId)) return json({error:"شناسه باید دقیقاً ۴ رقم باشد."},400);
     const user = await env.DB.prepare("SELECT id,public_id,username,role,created_at FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
     if (!user) return json({error:"کاربری با این شناسه پیدا نشد."},404);
     const projects = await env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first();
@@ -440,7 +440,7 @@ async function handleApi(request, env, url) {
       const {results}=await env.DB.prepare("SELECT u.id AS user_id,u.public_id,u.username,MAX(m.created_at) AS last_message,SUM(CASE WHEN m.sender_role='user' AND m.read_at IS NULL THEN 1 ELSE 0 END) AS unread, (SELECT body FROM owner_messages x WHERE x.user_id=u.id ORDER BY x.created_at DESC LIMIT 1) AS last_body FROM users u JOIN owner_messages m ON m.user_id=u.id GROUP BY u.id ORDER BY last_message DESC LIMIT 100").all();
       return json({items:results||[]});
     }
-    const ownerThread=path.match(/^\\/api\\/admin\\/owner-chat\\/([0-9a-f-]+)$/i);
+    const ownerThread=path.match(/^\/api\/admin\/owner-chat\/([0-9a-f-]+)$/i);
     if(ownerThread && method === "GET") {
       if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
       const {results}=await env.DB.prepare("SELECT id,sender_role,body,read_at,created_at FROM owner_messages WHERE user_id=? ORDER BY created_at ASC LIMIT 200").bind(ownerThread[1]).all();
@@ -463,7 +463,7 @@ async function handleApi(request, env, url) {
       const {results}=await env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,u.public_id,u.username,r.title FROM ncoin_purchases p JOIN users u ON u.id=p.user_id JOIN ncoin_rewards r ON r.id=p.reward_id ORDER BY p.created_at DESC LIMIT 100").all();
       return json({items:results||[]});
     }
-    const purchaseStatus=path.match(/^\\/api\\/admin\\/ncoin\\/purchases\\/([0-9a-f-]+)\\/(approve|deliver|reject)$/i);
+    const purchaseStatus=path.match(/^\/api\/admin\/ncoin\/purchases\/([0-9a-f-]+)\/(approve|deliver|reject)$/i);
     if(purchaseStatus && method==="POST") {
       if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
       if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
