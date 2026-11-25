@@ -180,7 +180,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/myreports — گزارش‌های ثبت‌شده من\n/track شناسه — پیگیری درخواست انتشار\n/trackreport شناسه — پیگیری گزارش مشکل\n/history — تاریخچه دانلود\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
     return json({ok:true});
   }
   // Native self-service workspace for linked BotForge accounts.
@@ -592,7 +592,7 @@ async function handleTelegramWebhook(request, env) {
       if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
-        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
         return json({ok:true});
       } else if (userAction === "🔗 قطع اتصال تلگرام") {
         await setState("confirm_unlink");
