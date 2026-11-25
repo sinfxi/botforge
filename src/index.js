@@ -902,7 +902,7 @@ async function handleApi(request, env, url) {
     if(slug&&!/^[a-z0-9-]{2,80}$/.test(slug))return json({error:"شناسه پروژه معتبر نیست."},400);
     if(slug){const project=await env.DB.prepare("SELECT slug FROM bots WHERE slug=? AND status='published'").bind(slug).first();if(!project)return json({error:"پروژه منتشرشده پیدا نشد."},404);}
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS project_reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT, category TEXT NOT NULL DEFAULT 'other', message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
-    const recent=await env.DB.prepare("SELECT COUNT(*) AS n FROM project_reports WHERE user_id=? AND created_at>?").bind(auth.user.id,new Date(Date.now()-10*60*1000).toISOString()).first();
+    const recent=await env.DB.prepare("SELECT COUNT(*) AS n FROM project_reports WHERE user_id=? AND datetime(created_at)>datetime(?)").bind(auth.user.id,new Date(Date.now()-10*60*1000).toISOString()).first();
     if(Number(recent?.n||0)>=5)return json({error:"برای جلوگیری از ارسال تکراری، هر ۱۰ دقیقه حداکثر ۵ گزارش می‌توانی ثبت کنی."},429);
     const reportId=id();
     await env.DB.prepare("INSERT INTO project_reports(id,user_id,bot_slug,category,message) VALUES(?,?,?,?,?)").bind(reportId,auth.user.id,slug||null,category,message).run();
