@@ -89,6 +89,7 @@ After deploying an updated bot, an owner should open the BotForge admin panel an
 
 
 ## Latest Telegram and community improvements
+- Account security control lets a signed-in user revoke all other active sessions while preserving the current session.
 - Persistent Telegram chat keyboard now includes daily reward check-in and an account status summary.
 - `/checkin` safely claims the same daily N Coin streak reward as the website, with a database-level duplicate guard shared across both channels.
 - `/status` summarizes published projects, submission queue, wallet, active benefits, unread notifications and current check-in streak.
