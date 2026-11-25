@@ -528,6 +528,7 @@ async function handleApi(request, env, url) {
     const admin = await requireAdmin(request, env);
     if (admin.response) return admin.response;
     if (path === "/api/admin/telegram/register-webhook" && method === "POST") {
+      if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
       if (admin.user.role !== "owner") return json({error:"فقط مالک اصلی می‌تواند وب‌هوک ربات را ثبت کند."},403);
       if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return json({error:"ابتدا TELEGRAM_BOT_TOKEN و TELEGRAM_WEBHOOK_SECRET را در Cloudflare Worker Secrets تنظیم کن."},503);
       const base="https://api.telegram.org/bot"+env.TELEGRAM_BOT_TOKEN+"/";
