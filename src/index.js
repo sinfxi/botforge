@@ -109,7 +109,70 @@ async function handleTelegramWebhook(request, env) {
   const parts = textValue.split(/\s+/, 2), commandName = (parts[0] || "").toLowerCase().split("@")[0];
 
   if (commandName === "/connect") {
-    // Native self-service workspace for linked BotForge accounts.
+    if (chatType !== "private") {
+      await telegramSend(env, chatId, "برای اتصال حساب، گفت‌وگوی خصوصی ربات را باز کن و دستور /connect 1234 را بفرست.");
+      return json({ok:true});
+    }
+    const publicId = normalizeUserId(parts[1] || "");
+    if (!/^\d{4}$/.test(publicId)) {
+      await telegramSend(env, chatId, "شناسه ۴ رقمی حساب سایتت را وارد کن. نمونه: /connect 1234");
+      return json({ok:true});
+    }
+    const target = await env.DB.prepare("SELECT id,public_id FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
+    if (!target) {
+      await telegramSend(env, chatId, "حسابی با این شناسه پیدا نشد. شناسه را بررسی کن و دوباره بفرست.");
+      return json({ok:true});
+    }
+    const linked = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=?").bind(String(from.id)).first();
+    if (linked?.user_id === target.id) {
+      await telegramSend(env, chatId, "این حساب تلگرام از قبل به همین حساب سایت متصل است. برای دیدن امکانات /admin را بفرست.");
+      return json({ok:true});
+    }
+    if (linked && linked.user_id !== target.id) {
+      await telegramSend(env, chatId, "این حساب تلگرام قبلاً به یک حساب سایت دیگر متصل شده است. ابتدا اتصال قبلی را از همان حساب قطع کن.");
+      return json({ok:true});
+    }
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM telegram_link_requests WHERE telegram_user_id=? AND created_at>?").bind(String(from.id), new Date(Date.now()-60000).toISOString()).first();
+    if (Number(recent?.n || 0) >= 5) {
+      await telegramSend(env, chatId, "تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کن.");
+      return json({ok:true});
+    }
+    await env.DB.prepare("UPDATE telegram_link_requests SET status='cancelled' WHERE telegram_user_id=? AND status='pending'").bind(String(from.id)).run();
+    const requestId = id();
+    const expiresAt = new Date(Date.now()+10*60*1000).toISOString();
+    await env.DB.prepare("INSERT INTO telegram_link_requests(id,user_id,telegram_user_id,chat_id,username,first_name,status,expires_at) VALUES(?,?,?,?,?,?,'pending',?)")
+      .bind(requestId,target.id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),expiresAt).run();
+    await telegramSend(env, chatId, "درخواست اتصال برای شناسه " + publicId + " ثبت شد. برای تأیید، وارد حساب همان شناسه در سایت شو و در بخش اتصال تلگرام، درخواست را تأیید کن.\n\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/community.html\n\nاین درخواست تا ۱۰ دقیقه معتبر است.");
+    return json({ok:true});
+  }
+
+  if (commandName === "/start") {
+    const code = (parts[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (!code) {
+      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب سایتت، شناسه ۴ رقمی را این‌طور بفرست:\n/connect 1234\n\nبعد وارد همان حساب در سایت شو و درخواست اتصال را تأیید کن.");
+      return json({ok:true});
+    }
+    const record = await env.DB.prepare("SELECT id,user_id FROM telegram_link_codes WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(await sha256(code),now()).first();
+    if (!record) { await telegramSend(env, chatId, "این کد معتبر نیست یا منقضی شده. از داخل حساب سایت یک کد تازه بگیر."); return json({ok:true}); }
+    try {
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO telegram_links(user_id,telegram_user_id,chat_id,username,first_name,linked_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET telegram_user_id=excluded.telegram_user_id,chat_id=excluded.chat_id,username=excluded.username,first_name=excluded.first_name,linked_at=excluded.linked_at")
+          .bind(record.user_id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),now()),
+        env.DB.prepare("UPDATE telegram_link_codes SET used_at=? WHERE id=? AND used_at IS NULL").bind(now(),record.id)
+      ]);
+      const user = await env.DB.prepare("SELECT public_id,username FROM users WHERE id=?").bind(record.user_id).first();
+      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت به FXI BotForge متصل شد.\nشناسه سایت: " + user.public_id + "\nنام کاربری: @" + user.username + "\n\nاز این پس اعلان‌های مهم حسابت را همین‌جا دریافت می‌کنی.\nبرای امکانات مدیریتی: /admin");
+    } catch (error) {
+      console.error("Telegram account link failed:", error);
+      await telegramSend(env, chatId, "اتصال انجام نشد؛ ممکن است این حساب تلگرام قبلاً به حساب دیگری وصل شده باشد.");
+    }
+    return json({ok:true});
+  }
+  if (commandName === "/help") {
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/connect 1234 — اتصال حساب سایت\n/help — راهنما\n/admin — نمایش امکانات در دسترس");
+    return json({ok:true});
+  }
+  // Native self-service workspace for linked BotForge accounts.
   if (chatType === "private") {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_bot_states (telegram_user_id TEXT PRIMARY KEY, state TEXT NOT NULL, payload_json TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const linkedAccount = await env.DB.prepare("SELECT u.id,u.public_id,u.username,u.role,u.status FROM telegram_links l JOIN users u ON u.id=l.user_id WHERE l.telegram_user_id=? LIMIT 1").bind(String(from.id)).first();
@@ -371,8 +434,7 @@ async function handleTelegramWebhook(request, env) {
       if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
-        await telegramSend(env,chatId,"راهنمای FXI BotForge\n/menu — منوی اصلی\n/account — اطلاعات حساب\n/projects — پروژه‌های منتشرشده تو\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/submit — ارسال پروژه ZIP
-/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
         return json({ok:true});
       } else if (userAction === "🔗 قطع اتصال تلگرام") {
         await setState("confirm_unlink");
@@ -387,69 +449,6 @@ async function handleTelegramWebhook(request, env) {
     }
   }
 
-  if (chatType !== "private") {
-      await telegramSend(env, chatId, "برای اتصال حساب، گفت‌وگوی خصوصی ربات را باز کن و دستور /connect 1234 را بفرست.");
-      return json({ok:true});
-    }
-    const publicId = normalizeUserId(parts[1] || "");
-    if (!/^\d{4}$/.test(publicId)) {
-      await telegramSend(env, chatId, "شناسه ۴ رقمی حساب سایتت را وارد کن. نمونه: /connect 1234");
-      return json({ok:true});
-    }
-    const target = await env.DB.prepare("SELECT id,public_id FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
-    if (!target) {
-      await telegramSend(env, chatId, "حسابی با این شناسه پیدا نشد. شناسه را بررسی کن و دوباره بفرست.");
-      return json({ok:true});
-    }
-    const linked = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=?").bind(String(from.id)).first();
-    if (linked?.user_id === target.id) {
-      await telegramSend(env, chatId, "این حساب تلگرام از قبل به همین حساب سایت متصل است. برای دیدن امکانات /admin را بفرست.");
-      return json({ok:true});
-    }
-    if (linked && linked.user_id !== target.id) {
-      await telegramSend(env, chatId, "این حساب تلگرام قبلاً به یک حساب سایت دیگر متصل شده است. ابتدا اتصال قبلی را از همان حساب قطع کن.");
-      return json({ok:true});
-    }
-    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM telegram_link_requests WHERE telegram_user_id=? AND created_at>?").bind(String(from.id), new Date(Date.now()-60000).toISOString()).first();
-    if (Number(recent?.n || 0) >= 5) {
-      await telegramSend(env, chatId, "تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کن.");
-      return json({ok:true});
-    }
-    await env.DB.prepare("UPDATE telegram_link_requests SET status='cancelled' WHERE telegram_user_id=? AND status='pending'").bind(String(from.id)).run();
-    const requestId = id();
-    const expiresAt = new Date(Date.now()+10*60*1000).toISOString();
-    await env.DB.prepare("INSERT INTO telegram_link_requests(id,user_id,telegram_user_id,chat_id,username,first_name,status,expires_at) VALUES(?,?,?,?,?,?,'pending',?)")
-      .bind(requestId,target.id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),expiresAt).run();
-    await telegramSend(env, chatId, "درخواست اتصال برای شناسه " + publicId + " ثبت شد. برای تأیید، وارد حساب همان شناسه در سایت شو و در بخش اتصال تلگرام، درخواست را تأیید کن.\n\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/community.html\n\nاین درخواست تا ۱۰ دقیقه معتبر است.");
-    return json({ok:true});
-  }
-
-  if (commandName === "/start") {
-    const code = (parts[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
-    if (!code) {
-      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب سایتت، شناسه ۴ رقمی را این‌طور بفرست:\n/connect 1234\n\nبعد وارد همان حساب در سایت شو و درخواست اتصال را تأیید کن.");
-      return json({ok:true});
-    }
-    const record = await env.DB.prepare("SELECT id,user_id FROM telegram_link_codes WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(await sha256(code),now()).first();
-    if (!record) { await telegramSend(env, chatId, "این کد معتبر نیست یا منقضی شده. از داخل حساب سایت یک کد تازه بگیر."); return json({ok:true}); }
-    try {
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO telegram_links(user_id,telegram_user_id,chat_id,username,first_name,linked_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET telegram_user_id=excluded.telegram_user_id,chat_id=excluded.chat_id,username=excluded.username,first_name=excluded.first_name,linked_at=excluded.linked_at")
-          .bind(record.user_id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),now()),
-        env.DB.prepare("UPDATE telegram_link_codes SET used_at=? WHERE id=? AND used_at IS NULL").bind(now(),record.id)
-      ]);
-      const user = await env.DB.prepare("SELECT public_id,username FROM users WHERE id=?").bind(record.user_id).first();
-      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت به FXI BotForge متصل شد.\nشناسه سایت: " + user.public_id + "\nنام کاربری: @" + user.username + "\n\nاز این پس اعلان‌های مهم حسابت را همین‌جا دریافت می‌کنی.\nبرای امکانات مدیریتی: /admin");
-    } catch (error) {
-      console.error("Telegram account link failed:", error);
-      await telegramSend(env, chatId, "اتصال انجام نشد؛ ممکن است این حساب تلگرام قبلاً به حساب دیگری وصل شده باشد.");
-    }
-    return json({ok:true});
-  }
-  if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/connect 1234 — اتصال حساب سایت\n/help — راهنما\n/admin — نمایش امکانات در دسترس");
-    return json({ok:true});
-  }
   if (chatType !== "private") {
     if (commandName === "/admin" || commandName === "/panel") await telegramSend(env, chatId, "🔒 منوی مدیریت فقط در گفت‌وگوی خصوصی ربات فعال است.");
     return json({ok:true});
