@@ -83,9 +83,63 @@ async function audit(env, actor, action, targetType = null, targetId = null, det
   await env.DB.prepare("INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, details_json) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(id(), actor || null, action, targetType, targetId, details ? JSON.stringify(details) : null).run();
 }
+async function telegramSend(env, chatId, textValue) {
+  if (!env.TELEGRAM_BOT_TOKEN || !chatId) return false;
+  try {
+    const response = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/sendMessage", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: textValue, disable_web_page_preview: true })
+    });
+    return response.ok;
+  } catch (error) { console.error("Telegram send failed:", error); return false; }
+}
 async function notify(env, userId, title, body, type = "info") {
   await env.DB.prepare("INSERT INTO notifications (id, user_id, title, body, type) VALUES (?, ?, ?, ?, ?)")
     .bind(id(), userId, title, body, type).run();
+  const link = await env.DB.prepare("SELECT chat_id FROM telegram_links WHERE user_id=?").bind(userId).first();
+  if (link?.chat_id) await telegramSend(env, link.chat_id, "🔔 " + title + "\n\n" + body);
+}
+async function handleTelegramWebhook(request, env) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return json({error:"Telegram integration is not configured."},503);
+  if (request.headers.get("x-telegram-bot-api-secret-token") !== env.TELEGRAM_WEBHOOK_SECRET) return json({error:"Unauthorized"},401);
+  const update = await request.json().catch(() => null);
+  const message = update?.message;
+  const chatId = message?.chat?.id;
+  const from = message?.from;
+  const textValue = typeof message?.text === "string" ? message.text.trim() : "";
+  if (!chatId || !from || !textValue.startsWith("/")) return json({ok:true});
+  const command = textValue.split(/\s+/,2);
+  if (command[0].startsWith("/start")) {
+    const code = (command[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (!code) {
+      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب BotForge، وارد سایت شو و از بخش اتصال تلگرام کد یک‌بارمصرف بگیر؛ سپس اینجا بفرست: /start CODE");
+      return json({ok:true});
+    }
+    const record = await env.DB.prepare("SELECT id,user_id FROM telegram_link_codes WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(await sha256(code),now()).first();
+    if (!record) {
+      await telegramSend(env, chatId, "این کد معتبر نیست یا منقضی شده. از داخل حساب سایت یک کد تازه بگیر.");
+      return json({ok:true});
+    }
+    try {
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO telegram_links(user_id,telegram_user_id,chat_id,username,first_name,linked_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET telegram_user_id=excluded.telegram_user_id,chat_id=excluded.chat_id,username=excluded.username,first_name=excluded.first_name,linked_at=excluded.linked_at")
+          .bind(record.user_id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),now()),
+        env.DB.prepare("UPDATE telegram_link_codes SET used_at=? WHERE id=? AND used_at IS NULL").bind(now(),record.id)
+      ]);
+      const user = await env.DB.prepare("SELECT public_id,username FROM users WHERE id=?").bind(record.user_id).first();
+      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت به FXI BotForge متصل شد.\nشناسه سایت: " + user.public_id + "\nنام کاربری: @" + user.username + "\n\nاز این پس اعلان‌های مهم حسابت را همین‌جا دریافت می‌کنی.");
+    } catch (error) {
+      console.error("Telegram account link failed:", error);
+      await telegramSend(env, chatId, "اتصال انجام نشد؛ ممکن است این حساب تلگرام قبلاً به حساب دیگری وصل شده باشد.");
+    }
+    return json({ok:true});
+  }
+  if (command[0].startsWith("/help")) {
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/start CODE — اتصال حساب سایت\n/help — راهنما\nبرای مدیریت پروژه‌ها و جوایز از سایت استفاده کن.");
+    return json({ok:true});
+  }
+  await telegramSend(env, chatId, "برای اتصال حساب از دستور /start CODE استفاده کن. راهنما: /help");
+  return json({ok:true});
 }
 
 function luckyIdReward(publicId) {
@@ -199,6 +253,34 @@ async function handleApi(request, env, url) {
     return user ? json({ user }) : json({ user: null }, 401);
   }
 
+  if (path === "/api/telegram/status" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const link = await env.DB.prepare("SELECT username,first_name,linked_at FROM telegram_links WHERE user_id=?").bind(auth.user.id).first();
+    return json({linked:!!link,link:link||null,bot_username:"FxiCode_bot"});
+  }
+  if (path === "/api/telegram/link-code" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    if (!env.TELEGRAM_BOT_TOKEN) return json({error:"اتصال ربات هنوز در تنظیمات سرور کامل نشده است."},503);
+    const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const bytes=new Uint8Array(8); crypto.getRandomValues(bytes);
+    const code=[...bytes].map(x=>alphabet[x%alphabet.length]).join("");
+    const expiresAt=new Date(Date.now()+10*60*1000).toISOString();
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM telegram_link_codes WHERE user_id=? AND used_at IS NULL").bind(auth.user.id),
+      env.DB.prepare("INSERT INTO telegram_link_codes(id,user_id,code_hash,expires_at) VALUES(?,?,?,?)").bind(id(),auth.user.id,await sha256(code),expiresAt)
+    ]);
+    return json({ok:true,code,expires_at:expiresAt,bot_url:"https://t.me/FxiCode_bot"});
+  }
+  if (path === "/api/telegram/unlink" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("DELETE FROM telegram_links WHERE user_id=?").bind(auth.user.id).run();
+    return json({ok:true});
+  }
 
   if (path === "/api/community/me" && method === "GET") {
     const auth = await requireUser(request, env);
@@ -725,6 +807,10 @@ let STATIC_KV_COOLDOWN_UNTIL = 0;
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/telegram/webhook" && request.method === "POST") {
+      try { return await handleTelegramWebhook(request, env); }
+      catch (error) { console.error("Telegram webhook failed:", error); return json({ok:false},500); }
+    }
     if (url.pathname.startsWith("/api/")) {
       try { return await handleApi(request, env, url); }
       catch (error) { const requestId = id(); console.error("API request failed:", requestId, error); return json({ error: "ارتباط با سرویس کامل نشد. وضعیت اتصال را بررسی کن و دوباره تلاش کن.", request_id: requestId }, 500); }
