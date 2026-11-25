@@ -23,5 +23,7 @@ jobs:
           node --check public/app.js
       - name: Validate D1 migration chain and schema
         run: python tests/check_schema.py
+      - name: Validate Worker reward and Telegram contracts
+        run: python tests/check_worker_contract.py
       - name: Validate frontend markup and inline scripts
         run: python tests/check_frontend.py
