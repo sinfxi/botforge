@@ -169,7 +169,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/connect 1234 — اتصال حساب سایت\n/help — راهنما\n/admin — نمایش امکانات در دسترس");
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
     return json({ok:true});
   }
   // Native self-service workspace for linked BotForge accounts.
