@@ -694,7 +694,7 @@ async function handleApi(request, env, url) {
         const body = await request.json().catch(() => null);
         const username = safeText(body?.username, 24).toLowerCase();
         const password = typeof body?.password === "string" ? body.password : "";
-        const allowed = ["submissions","users","bots","audit","gifts"];
+        const allowed = ["submissions","users","bots","audit","gifts","announcements"];
         const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
         if (!/^[a-z0-9_]{3,24}$/.test(username) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "نام کاربری معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
         const salt = id(), managerId = id();
@@ -714,7 +714,7 @@ async function handleApi(request, env, url) {
         if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
         const target=await env.DB.prepare("SELECT id,username FROM users WHERE id=? AND role='admin'").bind(managerRoute[1]).first();
         if (!target) return json({error:"مدیر پیدا نشد."},404);
-        const body=await request.json().catch(()=>null), allowed=["submissions","users","bots","audit"];
+        const body=await request.json().catch(()=>null), allowed=["submissions","users","bots","audit","gifts","announcements"];
         const permissions=Array.isArray(body?.permissions)?[...new Set(body.permissions.filter(p=>allowed.includes(p)))]:[];
         if (!permissions.length) return json({error:"حداقل یک دسترسی انتخاب کن."},400);
         await env.DB.prepare("UPDATE users SET permissions_json=?,updated_at=? WHERE id=? AND role='admin'").bind(JSON.stringify(permissions),now(),target.id).run();
