@@ -66,7 +66,7 @@ async function requireAdmin(request, env) {
   if (auth.response) return auth;
   return ["admin", "owner"].includes(auth.user.role) ? auth : { response: json({ error: "اجازه دسترسی ندارید." }, 403) };
 }
-function safePermissions(value) { try { const p=JSON.parse(value || "[]"); return Array.isArray(p) ? [...new Set(p.filter(x => ["submissions","users","bots","audit","gifts"].includes(x)))] : []; } catch { return []; } }
+function safePermissions(value) { try { const p=JSON.parse(value || "[]"); return Array.isArray(p) ? [...new Set(p.filter(x => ["submissions","users","bots","audit","gifts","announcements"].includes(x)))] : []; } catch { return []; } }
 function sameOrigin(request) {
   const requestUrl = new URL(request.url);
   const origin = request.headers.get("origin");
@@ -560,6 +560,11 @@ async function handleApi(request, env, url) {
     return json({ok:true,id:messageId},201);
   }
 
+  if (path === "/api/announcements" && method === "GET") {
+    const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,image_url,created_at,expires_at FROM announcements WHERE active=1 AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 5").bind(now()).all();
+    return json({items:results||[]},200,{"cache-control":"public, max-age=0, s-maxage=20, stale-while-revalidate=40"});
+  }
+
   if (path === "/api/public/stats" && method === "GET") {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
@@ -723,6 +728,47 @@ async function handleApi(request, env, url) {
         await env.DB.prepare("UPDATE users SET role='user',permissions_json=NULL,updated_at=? WHERE id=? AND role='admin'").bind(now(),target.id).run();
         await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
         await audit(env,admin.user.id,"manager.remove","user",target.id,{username:target.username});
+        return json({ok:true});
+      }
+      return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
+    }
+
+    if (path.startsWith("/api/admin/announcements")) {
+      if (admin.user.role !== "owner" && !safePermissions(admin.user.permissions_json).includes("announcements")) return json({error:"دسترسی انتشار اطلاع‌رسانی برای این حساب فعال نیست."},403);
+      if (path === "/api/admin/announcements" && method === "GET") {
+        const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,image_url,active,created_at,expires_at FROM announcements ORDER BY created_at DESC LIMIT 100").all();
+        return json({items:results||[]});
+      }
+      if (path === "/api/admin/announcements" && method === "POST") {
+        if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+        const body=await request.json().catch(()=>null);
+        const kind=body?.kind==="gift"?"gift":"notice";
+        const title=safeText(body?.title,100),message=safeText(body?.body,1200);
+        const imageUrl=safeText(body?.image_url,500)||"/assets/cyrus-hero.webp";
+        const expiryDate=body?.expires_at?new Date(body.expires_at):null;
+        const expiry=expiryDate&&!Number.isNaN(expiryDate.getTime())?expiryDate.toISOString():null;
+        if(title.length<3||message.length<2||(body?.expires_at&&(!expiry||expiry<=now())))return json({error:"عنوان، متن یا تاریخ انقضا معتبر نیست."},400);
+        if(!(imageUrl.startsWith("/")&&!imageUrl.startsWith("//"))&&!imageUrl.startsWith("https://"))return json({error:"آدرس تصویر باید مسیر داخلی یا HTTPS باشد."},400);
+        let giftCode=null,amount=null,maxUses=null;
+        if(kind==="gift"){
+          amount=Math.floor(Number(body?.amount));maxUses=Math.floor(Number(body?.max_uses));
+          if(!Number.isInteger(amount)||amount<1||amount>1000000||!Number.isInteger(maxUses)||maxUses<1||maxUses>10000)return json({error:"مقدار سکه و تعداد دفعات استفاده معتبر نیست."},400);
+          await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_codes (id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, code_hint TEXT NOT NULL, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, used_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+          const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
+          giftCode=Array.from(bytes,b=>alphabet[b%alphabet.length]).join("").match(/.{1,4}/g).join("-");
+          await env.DB.prepare("INSERT INTO gift_codes(id,code_hash,code_hint,amount,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?)").bind(id(),await sha256(giftCode.toUpperCase()),giftCode.slice(-4),amount,maxUses,expiry,admin.user.id).run();
+        }
+        const announcementId=id();
+        await env.DB.prepare("INSERT INTO announcements(id,title,body,kind,gift_code,image_url,active,created_by,expires_at) VALUES(?,?,?,?,?,?,1,?,?)").bind(announcementId,title,message,kind,giftCode,imageUrl,admin.user.id,expiry).run();
+        await audit(env,admin.user.id,"announcement.create","announcement",announcementId,{kind,amount,max_uses:maxUses});
+        return json({ok:true,id:announcementId,kind,gift_code:giftCode,amount,max_uses:maxUses},201);
+      }
+      const announcementMatch=path.match(/^\/api\/admin\/announcements\/([A-Za-z0-9_-]+)$/);
+      if(announcementMatch&&method==="DELETE"){
+        if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+        const result=await env.DB.prepare("UPDATE announcements SET active=0 WHERE id=? AND active=1").bind(announcementMatch[1]).run();
+        if(Number(result?.meta?.changes??result?.changes??0)!==1)return json({error:"اطلاع‌رسانی پیدا نشد یا قبلاً غیرفعال شده است."},404);
+        await audit(env,admin.user.id,"announcement.disable","announcement",announcementMatch[1]);
         return json({ok:true});
       }
       return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
