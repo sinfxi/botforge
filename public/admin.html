@@ -193,13 +193,19 @@
     try {
       response = await fetch(url, { credentials:"same-origin", cache:"no-store", ...options, headers });
     } catch (cause) {
-      const error = new Error("ارتباط با سرور برقرار نشد. اتصال اینترنت و آدرس سایت را بررسی کن و دوباره تلاش کن.");
+      const isUpload = options.body instanceof FormData;
+      const detail = cause && typeof cause.message === "string" ? cause.message : "خطای شبکه";
+      const error = new Error(isUpload
+        ? "ارسال فایل به سرور کامل نشد (" + (cause?.name || "NetworkError") + "). اتصال را بررسی کن و دوباره تلاش کن. جزئیات: " + detail
+        : "ارتباط با سرور برقرار نشد (" + (cause?.name || "NetworkError") + "). جزئیات: " + detail);
       error.cause = cause;
+      error.code = cause?.name || "NETWORK_ERROR";
       throw error;
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(data.error || "درخواست ناموفق بود.");
+      const requestId = data.request_id ? " (کد پیگیری: " + data.request_id + ")" : "";
+      const error = new Error((data.error || "درخواست ناموفق بود.") + requestId);
       error.status = response.status;
       throw error;
     }
@@ -382,7 +388,7 @@
       messageEl.textContent = "کد و نام فایل معتبر (مثل main.py) را وارد کن.";
       return;
     }
-    if (kind !== "code" && (!file || file.size > 5 * 1024 * 1024 || (kind === "zip" && !file.name.toLowerCase().endsWith(".zip")))) {
+    if (kind !== "code" && (!file || file.size < 1 || file.size > 5 * 1024 * 1024 || (kind === "zip" && !file.name.toLowerCase().endsWith(".zip")))) {
       messageEl.textContent = kind === "zip" ? "یک فایل ZIP معتبر با حجم حداکثر ۵ مگابایت انتخاب کن." : "یک فایل با حجم حداکثر ۵ مگابایت انتخاب کن.";
       return;
     }
