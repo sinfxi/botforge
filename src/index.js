@@ -750,24 +750,31 @@ async function handleApi(request, env, url) {
         if(title.length<3||message.length<2||(body?.expires_at&&(!expiry||expiry<=now())))return json({error:"عنوان، متن یا تاریخ انقضا معتبر نیست."},400);
         if(!(imageUrl.startsWith("/")&&!imageUrl.startsWith("//"))&&!imageUrl.startsWith("https://"))return json({error:"آدرس تصویر باید مسیر داخلی یا HTTPS باشد."},400);
         let giftCode=null,amount=null,maxUses=null;
+        const announcementId=id();
+        const announcementStatements=[];
         if(kind==="gift"){
           amount=Math.floor(Number(body?.amount));maxUses=Math.floor(Number(body?.max_uses));
           if(!Number.isInteger(amount)||amount<1||amount>1000000||!Number.isInteger(maxUses)||maxUses<1||maxUses>10000)return json({error:"مقدار سکه و تعداد دفعات استفاده معتبر نیست."},400);
           await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_codes (id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, code_hint TEXT NOT NULL, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, used_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
           const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
           giftCode=Array.from(bytes,b=>alphabet[b%alphabet.length]).join("").match(/.{1,4}/g).join("-");
-          await env.DB.prepare("INSERT INTO gift_codes(id,code_hash,code_hint,amount,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?)").bind(id(),await sha256(giftCode.toUpperCase()),giftCode.slice(-4),amount,maxUses,expiry,admin.user.id).run();
+          announcementStatements.push(env.DB.prepare("INSERT INTO gift_codes(id,code_hash,code_hint,amount,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?)").bind(id(),await sha256(giftCode.toUpperCase()),giftCode.slice(-4),amount,maxUses,expiry,admin.user.id));
         }
-        const announcementId=id();
-        await env.DB.prepare("INSERT INTO announcements(id,title,body,kind,gift_code,image_url,active,created_by,expires_at,gift_amount,gift_max_uses) VALUES(?,?,?,?,?,?,1,?,?,?,?)").bind(announcementId,title,message,kind,giftCode,imageUrl,admin.user.id,expiry,amount,maxUses).run();
+        announcementStatements.push(env.DB.prepare("INSERT INTO announcements(id,title,body,kind,gift_code,image_url,active,created_by,expires_at,gift_amount,gift_max_uses) VALUES(?,?,?,?,?,?,1,?,?,?,?)").bind(announcementId,title,message,kind,giftCode,imageUrl,admin.user.id,expiry,amount,maxUses));
+        await env.DB.batch(announcementStatements);
         await audit(env,admin.user.id,"announcement.create","announcement",announcementId,{kind,amount,max_uses:maxUses});
         return json({ok:true,id:announcementId,kind,gift_code:giftCode,amount,max_uses:maxUses},201);
       }
       const announcementMatch=path.match(/^\/api\/admin\/announcements\/([A-Za-z0-9_-]+)$/);
       if(announcementMatch&&method==="DELETE"){
         if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
-        const result=await env.DB.prepare("UPDATE announcements SET active=0 WHERE id=? AND active=1").bind(announcementMatch[1]).run();
-        if(Number(result?.meta?.changes??result?.changes??0)!==1)return json({error:"اطلاع‌رسانی پیدا نشد یا قبلاً غیرفعال شده است."},404);
+        const existing=await env.DB.prepare("SELECT kind,gift_code FROM announcements WHERE id=? AND active=1").bind(announcementMatch[1]).first();
+        if(!existing)return json({error:"اطلاع‌رسانی پیدا نشد یا قبلاً غیرفعال شده است."},404);
+        const statements=[env.DB.prepare("UPDATE announcements SET active=0 WHERE id=? AND active=1").bind(announcementMatch[1])];
+        if(existing.kind==="gift"&&existing.gift_code){
+          statements.push(env.DB.prepare("UPDATE gift_codes SET active=0 WHERE code_hash=?").bind(await sha256(existing.gift_code.toUpperCase())));
+        }
+        await env.DB.batch(statements);
         await audit(env,admin.user.id,"announcement.disable","announcement",announcementMatch[1]);
         return json({ok:true});
       }
