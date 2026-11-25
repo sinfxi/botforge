@@ -109,6 +109,44 @@ async function handleTelegramWebhook(request, env) {
   if (!chatId || !from || !textValue) return json({ok:true});
   const parts = textValue.split(/\s+/, 2), commandName = (parts[0] || "").toLowerCase().split("@")[0];
 
+  if (commandName === "/connect") {
+    if (chatType !== "private") {
+      await telegramSend(env, chatId, "برای اتصال حساب، گفت‌وگوی خصوصی ربات را باز کن و دستور /connect 1234 را بفرست.");
+      return json({ok:true});
+    }
+    const publicId = normalizeUserId(parts[1] || "");
+    if (!/^\d{4}$/.test(publicId)) {
+      await telegramSend(env, chatId, "شناسه ۴ رقمی حساب سایتت را وارد کن. نمونه: /connect 1234");
+      return json({ok:true});
+    }
+    const target = await env.DB.prepare("SELECT id,public_id FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
+    if (!target) {
+      await telegramSend(env, chatId, "حسابی با این شناسه پیدا نشد. شناسه را بررسی کن و دوباره بفرست.");
+      return json({ok:true});
+    }
+    const linked = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=?").bind(String(from.id)).first();
+    if (linked?.user_id === target.id) {
+      await telegramSend(env, chatId, "این حساب تلگرام از قبل به همین حساب سایت متصل است. برای دیدن امکانات /admin را بفرست.");
+      return json({ok:true});
+    }
+    if (linked && linked.user_id !== target.id) {
+      await telegramSend(env, chatId, "این حساب تلگرام قبلاً به یک حساب سایت دیگر متصل شده است. ابتدا اتصال قبلی را از همان حساب قطع کن.");
+      return json({ok:true});
+    }
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM telegram_link_requests WHERE telegram_user_id=? AND created_at>?").bind(String(from.id), new Date(Date.now()-60000).toISOString()).first();
+    if (Number(recent?.n || 0) >= 5) {
+      await telegramSend(env, chatId, "تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کن.");
+      return json({ok:true});
+    }
+    await env.DB.prepare("UPDATE telegram_link_requests SET status='cancelled' WHERE telegram_user_id=? AND status='pending'").bind(String(from.id)).run();
+    const requestId = id();
+    const expiresAt = new Date(Date.now()+10*60*1000).toISOString();
+    await env.DB.prepare("INSERT INTO telegram_link_requests(id,user_id,telegram_user_id,chat_id,username,first_name,status,expires_at) VALUES(?,?,?,?,?,?,'pending',?)")
+      .bind(requestId,target.id,String(from.id),String(chatId),safeText(from.username,64),safeText(from.first_name,100),expiresAt).run();
+    await telegramSend(env, chatId, "درخواست اتصال برای شناسه " + publicId + " ثبت شد. برای تأیید، وارد حساب همان شناسه در سایت شو و در بخش اتصال تلگرام، درخواست را تأیید کن.\n\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/community.html\n\nاین درخواست تا ۱۰ دقیقه معتبر است.");
+    return json({ok:true});
+  }
+
   if (commandName === "/start") {
     const code = (parts[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
     if (!code) {
@@ -132,7 +170,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/start CODE — اتصال حساب سایت\n/help — راهنما\n/admin — منوی مدیریت (فقط مالک و مدیران مجاز)");
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/connect 1234 — اتصال حساب سایت\n/help — راهنما\n/admin — نمایش امکانات در دسترس");
     return json({ok:true});
   }
   if (chatType !== "private") {
@@ -158,18 +196,18 @@ async function handleTelegramWebhook(request, env) {
   };
   const showMenu = async () => {
     if (!isManager) {
-      await telegramSend(env,chatId,"⛔ این حساب نقش مالک یا مدیر ندارد. ابتدا حساب سایت را متصل کن؛ دسترسی مدیر فقط توسط مالک فعال می‌شود.");
+      await telegramSend(env,chatId,"⛔ برای این حساب دسترسی مدیریتی فعالی وجود ندارد.");
       return;
     }
-    await telegramSend(env,chatId,"🛠 منوی مدیریت FXI BotForge\nنقش: "+(manager.role==="owner"?"مالک اصلی":"مدیر")+"\nشناسه: "+manager.public_id+"\nفقط گزینه‌های دارای مجوز برایت نمایش داده شده‌اند.",menu);
+    await telegramSend(env,chatId,"🛠 امکانات مدیریتی FXI BotForge\\nشناسه حساب: "+manager.public_id+"\\nفقط گزینه‌های فعال برایت نمایش داده شده‌اند.",menu);
   };
   const label = textValue;
   if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
   if (label === "❌ بستن منو") { await telegramSend(env,chatId,"منوی مدیریت بسته شد.",{remove_keyboard:true}); return json({ok:true}); }
   const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🤖 پروژه‌ها","🧾 گزارش فعالیت","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
     ["/stats","/pending","/users","/projects","/activity","/gifts","/site"].includes(commandName);
-  if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. مدیران می‌توانند منو را با /admin باز کنند."); return json({ok:true}); }
-  if (!isManager) { await telegramSend(env,chatId,"⛔ دسترسی مدیریت نداری. این بخش فقط برای مالک و مدیران مجاز است."); return json({ok:true}); }
+  if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. با /admin می‌توانی امکانات در دسترس را ببینی."); return json({ok:true}); }
+  if (!isManager) { await telegramSend(env,chatId,"⛔ برای این بخش دسترسی فعالی نداری."); return json({ok:true}); }
 
   if (label === "📊 آمار کلی" || commandName === "/stats") {
     const jobs = [];
@@ -182,32 +220,32 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (label === "📥 درخواست‌های جدید" || commandName === "/pending") {
-    if (!can("submissions")) { await telegramSend(env,chatId,"⛔ مجوز بررسی درخواست‌ها فعال نیست.",menu); return json({ok:true}); }
+    if (!can("submissions")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT id,title,category FROM submissions WHERE status='pending' ORDER BY created_at ASC LIMIT 8").all();
     const body=results.length?results.map((x,i)=>(i+1)+". "+safeText(x.title,90)+" | "+safeText(x.category,40)+"\nکد: "+x.id).join("\n\n"):"درخواست بررسی‌نشده‌ای وجود ندارد.";
     await telegramSend(env,chatId,"📥 درخواست‌های جدید\n\n"+body+"\n\nبرای تأیید یا رد، پنل را باز کن:\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/admin.html",menu);
     return json({ok:true});
   }
   if (label === "👥 کاربران" || commandName === "/users") {
-    if (!can("users")) { await telegramSend(env,chatId,"⛔ مجوز مشاهده کاربران فعال نیست.",menu); return json({ok:true}); }
+    if (!can("users")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT public_id,username,role,status FROM users ORDER BY created_at DESC LIMIT 10").all();
-    await telegramSend(env,chatId,"👥 آخرین کاربران\n\n"+(results.map(x=>"• "+x.public_id+" | @"+safeText(x.username,24)+" | "+(x.role==="owner"?"مالک":x.role==="admin"?"مدیر":"کاربر")+" | "+(x.status==="active"?"فعال":"غیرفعال")).join("\n")||"کاربری پیدا نشد."),menu);
+    await telegramSend(env,chatId,"👥 آخرین کاربران\n\n"+(results.map(x=>"• "+x.public_id+" | @"+safeText(x.username,24)+" | "+(x.status==="active"?"فعال":"غیرفعال")).join("\n")||"کاربری پیدا نشد."),menu);
     return json({ok:true});
   }
   if (label === "🤖 پروژه‌ها" || commandName === "/projects") {
-    if (!can("bots")) { await telegramSend(env,chatId,"⛔ مجوز مشاهده پروژه‌ها فعال نیست.",menu); return json({ok:true}); }
+    if (!can("bots")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT title,category,slug FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 10").all();
     await telegramSend(env,chatId,"🤖 پروژه‌های منتشرشده\n\n"+(results.map(x=>"• "+safeText(x.title,90)+" | "+safeText(x.category,40)+"\n"+x.slug).join("\n\n")||"پروژه‌ای منتشر نشده است."),menu);
     return json({ok:true});
   }
   if (label === "🧾 گزارش فعالیت" || commandName === "/activity") {
-    if (!can("audit")) { await telegramSend(env,chatId,"⛔ مجوز گزارش فعالیت فعال نیست.",menu); return json({ok:true}); }
+    if (!can("audit")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT action,target_type,created_at FROM audit_logs ORDER BY created_at DESC LIMIT 10").all();
     await telegramSend(env,chatId,"🧾 آخرین فعالیت‌ها\n\n"+(results.map(x=>"• "+safeText(x.action,80)+" | "+safeText(x.target_type||"—",30)+"\n"+x.created_at).join("\n")||"گزارشی ثبت نشده است."),menu);
     return json({ok:true});
   }
   if (label === "🎁 مدیریت هدایا" || commandName === "/gifts") {
-    if (!can("gifts")) { await telegramSend(env,chatId,"⛔ مجوز مدیریت هدایا فعال نیست.",menu); return json({ok:true}); }
+    if (!can("gifts")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     await telegramSend(env,chatId,"🎁 مدیریت کدهای هدیه از پنل انجام می‌شود:\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/admin.html",menu);
     return json({ok:true});
   }
@@ -333,7 +371,8 @@ async function handleApi(request, env, url) {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
     const link = await env.DB.prepare("SELECT username,first_name,linked_at FROM telegram_links WHERE user_id=?").bind(auth.user.id).first();
-    return json({linked:!!link,link:link||null,bot_username:"FxiCode_bot"});
+    const {results:requests=[]} = await env.DB.prepare("SELECT id,username,first_name,created_at,expires_at FROM telegram_link_requests WHERE user_id=? AND status='pending' AND expires_at>? ORDER BY created_at DESC LIMIT 5").bind(auth.user.id,now()).all();
+    return json({linked:!!link,link:link||null,requests,bot_username:"FxiCode_bot"});
   }
   if (path === "/api/telegram/link-code" && method === "POST") {
     if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
@@ -350,6 +389,27 @@ async function handleApi(request, env, url) {
     ]);
     return json({ok:true,code,expires_at:expiresAt,bot_url:"https://t.me/FxiCode_bot"});
   }
+  if (path === "/api/telegram/confirm" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const body = await request.json().catch(()=>null);
+    const requestId = safeText(body?.request_id,64);
+    if (!requestId) return json({error:"درخواست اتصال معتبر نیست."},400);
+    const pending = await env.DB.prepare("SELECT id,user_id,telegram_user_id,chat_id,username,first_name FROM telegram_link_requests WHERE id=? AND user_id=? AND status='pending' AND expires_at>?").bind(requestId,auth.user.id,now()).first();
+    if (!pending) return json({error:"درخواست پیدا نشد یا منقضی شده است."},404);
+    const existing = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=?").bind(pending.telegram_user_id).first();
+    if (existing && existing.user_id !== auth.user.id) return json({error:"این حساب تلگرام به حساب سایت دیگری متصل است."},409);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO telegram_links(user_id,telegram_user_id,chat_id,username,first_name,linked_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET telegram_user_id=excluded.telegram_user_id,chat_id=excluded.chat_id,username=excluded.username,first_name=excluded.first_name,linked_at=excluded.linked_at")
+        .bind(auth.user.id,pending.telegram_user_id,pending.chat_id,pending.username||"",pending.first_name||"",now()),
+      env.DB.prepare("UPDATE telegram_link_requests SET status='confirmed' WHERE id=? AND user_id=? AND status='pending'").bind(pending.id,auth.user.id)
+    ]);
+    await telegramSend(env,pending.chat_id,"اتصال حساب با موفقیت تأیید شد. از این پس اعلان‌های حساب سایتت را همین‌جا دریافت می‌کنی. برای دیدن امکانات /admin را بفرست.");
+    await audit(env,auth.user.id,"telegram.account.link","telegram",pending.telegram_user_id,{public_id:auth.user.public_id});
+    return json({ok:true});
+  }
+
   if (path === "/api/telegram/unlink" && method === "POST") {
     if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
     const auth = await requireUser(request, env);
@@ -612,7 +672,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع و اتصال حساب"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"منوی مدیریت مدیران مجاز"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع و اتصال حساب"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
