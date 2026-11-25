@@ -91,7 +91,7 @@ async function notify(env, userId, title, body, type = "info") {
 function luckyIdReward(publicId) {
   const d = String(publicId || "");
   if (!/^\d{4}$/.test(d)) return null;
-  if (/^(\d)\\1{3}$/.test(d)) return { pattern: "چهار رقم یکسان", reward: 1000, title: "شناسه افسانه‌ای" };
+  if (d[0] === d[1] && d[1] === d[2] && d[2] === d[3]) return { pattern: "چهار رقم یکسان", reward: 1000, title: "شناسه افسانه‌ای" };
   if (d === "1234" || d === "4321" || d === "2345" || d === "5432" || d === "6789" || d === "9876") return { pattern: "ترتیب پیوسته", reward: 400, title: "شناسه ترتیبی" };
   if (d[0] === d[3] && d[1] === d[2]) return { pattern: "قرینه", reward: 300, title: "شناسه آینه‌ای" };
   if (d[0] === d[1] && d[2] === d[3]) return { pattern: "دو جفت", reward: 200, title: "شناسه دوتایی" };
