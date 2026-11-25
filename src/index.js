@@ -117,7 +117,10 @@ async function handleTelegramWebhook(request, env) {
   const message = update?.message, chatId = message?.chat?.id, chatType = message?.chat?.type || "", from = message?.from;
   const textValue = typeof message?.text === "string" ? message.text.trim() : typeof message?.caption === "string" ? message.caption.trim() : "";
   if (!chatId || !from || (!textValue && !message?.document)) return json({ok:true});
-  const parts = textValue.split(/\s+/, 2), commandName = (parts[0] || "").toLowerCase().split("@")[0];
+  const commandToken = (textValue.match(/^\S+/) || [""])[0];
+  const argsText = textValue.slice(commandToken.length).trim();
+  const parts = [commandToken, (argsText.match(/^\S+/) || [""])[0], argsText];
+  const commandName = (parts[0] || "").toLowerCase().split("@")[0];
 
   if (commandName === "/connect") {
     if (chatType !== "private") {
@@ -474,7 +477,7 @@ async function handleTelegramWebhook(request, env) {
         return json({ok:true});
       }
       if (commandName === "/search" || state === "search_catalog") {
-        const query = safeText(commandName === "/search" ? parts[1] || "" : userAction,80);
+        const query = safeText(commandName === "/search" ? parts[2] || "" : userAction,80);
         if (!query) { await setState("search_catalog"); await telegramSend(env,chatId,"عبارت جستجو را بفرست؛ می‌توانی نام پروژه یا دسته‌بندی را وارد کنی.",menuKeyboard); return json({ok:true}); }
         await clearState();
         const like = "%"+query.replace(/[\\%_]/g,"")+"%";
