@@ -247,7 +247,7 @@ async function handleTelegramWebhook(request, env) {
         if (!document) { await telegramSend(env,chatId,"منتظر فایل ZIP هستم. فایل را به‌صورت Document بفرست؛ حداکثر ۵ مگابایت."); return json({ok:true}); }
         const filename = safeFilename(document.file_name || "source.zip");
         const fileSize = Number(document.file_size || 0);
-        if (!filename.toLowerCase().endsWith(".zip") || fileSize < 4 || fileSize > (Number(env.MAX_UPLOAD_BYTES)||MAX_UPLOAD)) {
+        if (!filename.toLowerCase().endsWith(".zip") || (fileSize > 0 && fileSize < 4) || fileSize > (Number(env.MAX_UPLOAD_BYTES)||MAX_UPLOAD)) {
           await telegramSend(env,chatId,"فقط فایل ZIP با حجم حداکثر ۵ مگابایت پذیرفته می‌شود. فایل دیگری بفرست یا «لغو» کن.");
           return json({ok:true});
         }
