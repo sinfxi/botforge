@@ -73,7 +73,7 @@ The connected `@FxiCode_bot` account can manage the core user workspace without 
 - Claim eligible one-time lucky-ID rewards, browse and purchase N Coin rewards with a confirmation step, and redeem gift codes.
 - Track submission decisions with `/track`, view report status with `/myreports` and `/trackreport`, read notifications and announcements, message support, and unlink the Telegram account.
 - The permission-checked manager menu is available only to linked, active manager accounts. Its Telegram reply-keyboard shortcuts support:
-- Reviewing pending submissions with one-tap `/approve` and `/reject` buttons; the same permission checks, publication flow, user notification, audit record, and 50 N Coin approval reward are applied.
+- Reviewing pending submissions with one-tap `/approve` and `/reject` buttons; the same permission checks, publication flow, user notification, audit record, and 100 N Coin approval reward are applied.
 - Searching for a user by 4-digit public ID, viewing account status, published project count and N Coin balance, and activating/suspending eligible user accounts after a second confirmation.
 - Browsing published projects and archiving one from its Telegram button; archived files are removed from KV and the action is audited.
 - Viewing open project reports and resolving them with user notification.
@@ -94,3 +94,9 @@ After deploying an updated bot, an owner should open the BotForge admin panel an
 - `/checkin` safely claims the same daily N Coin streak reward as the website, with a database-level duplicate guard shared across both channels.
 - `/status` summarizes published projects, submission queue, wallet, active benefits, unread notifications and current check-in streak.
 - Community page now visualizes the last seven days of check-in progress with responsive streak tiles.
+
+
+## Creator leaderboard and project rewards
+- Every project that passes moderation and is published earns its creator **100 F COIN**. Pending, rejected, or duplicate submissions do not earn coins.
+- The approval reward is credited to the same D1 wallet and transaction history whether approval happens in the website admin panel or Telegram manager workflow.
+- Signed-in members can view the top 10 creators at `/api/community/leaderboard`; linked Telegram users can use the persistent **🏆 برترین سازندگان** button or `/top`.
