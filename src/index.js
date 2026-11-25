@@ -109,7 +109,217 @@ async function handleTelegramWebhook(request, env) {
   const parts = textValue.split(/\s+/, 2), commandName = (parts[0] || "").toLowerCase().split("@")[0];
 
   if (commandName === "/connect") {
-    if (chatType !== "private") {
+    // Native self-service workspace for linked BotForge accounts.
+  if (chatType === "private") {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_bot_states (telegram_user_id TEXT PRIMARY KEY, state TEXT NOT NULL, payload_json TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    const linkedAccount = await env.DB.prepare("SELECT u.id,u.public_id,u.username,u.role,u.status FROM telegram_links l JOIN users u ON u.id=l.user_id WHERE l.telegram_user_id=? LIMIT 1").bind(String(from.id)).first();
+    const menuKeyboard = {
+      keyboard: [
+        [{text:"👤 حساب من"},{text:"💰 کیف پول"}],
+        [{text:"📦 پروژه‌های من"},{text:"📨 درخواست‌های من"}],
+        [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
+        [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
+        [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
+        [{text:"❔ راهنما"}]
+      ], resize_keyboard:true, is_persistent:true
+    };
+    const sendHome = async () => {
+      if (!linkedAccount || linkedAccount.status !== "active") {
+        await telegramSend(env,chatId,"برای استفاده از امکانات حساب، ابتدا حساب سایتت را متصل کن:\n/connect 1234\n\nبعد درخواست اتصال را از داخل همان حساب در سایت تأیید کن.");
+        return;
+      }
+      await env.DB.prepare("DELETE FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).run();
+      await telegramSend(env,chatId,"سلام "+safeText(from.first_name || linkedAccount.username,40)+" 👋\nبه فضای کاربری FXI BotForge خوش اومدی.\n\nاز دکمه‌های زیر برای مدیریت حساب، پروژه‌ها، کیف پول و پشتیبانی استفاده کن.",menuKeyboard);
+    };
+    const setState = async (state,payload=null) => env.DB.prepare("INSERT INTO telegram_bot_states(telegram_user_id,state,payload_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_user_id) DO UPDATE SET state=excluded.state,payload_json=excluded.payload_json,updated_at=excluded.updated_at")
+      .bind(String(from.id),state,payload?JSON.stringify(payload):null,now()).run();
+    const clearState = async () => env.DB.prepare("DELETE FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).run();
+    const stateRow = await env.DB.prepare("SELECT state,payload_json FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).first();
+    const state = stateRow?.state || "";
+    let statePayload = {};
+    try { statePayload = JSON.parse(stateRow?.payload_json || "{}"); } catch {}
+    const userAction = textValue;
+    if (commandName === "/menu" || commandName === "/account" || userAction === "🏠 منوی اصلی") { await sendHome(); return json({ok:true}); }
+    if (commandName === "/projects" || commandName === "/wallet" || commandName === "/rewards" || commandName === "/gift" || commandName === "/notifications" || commandName === "/support") {
+      if (!linkedAccount) { await sendHome(); return json({ok:true}); }
+    }
+    if (linkedAccount && linkedAccount.status === "active") {
+      if (state === "gift_code" && !textValue.startsWith("/")) {
+        const code = safeText(textValue,32).toUpperCase().replace(/[^A-Z0-9]/g,"");
+        await clearState();
+        if (code.length !== 12) { await telegramSend(env,chatId,"کد باید ۱۲ کاراکتر باشد. دوباره از «🎁 ثبت کد هدیه» شروع کن.",menuKeyboard); return json({ok:true}); }
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_codes (id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, code_hint TEXT NOT NULL, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, used_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_redemptions (id TEXT PRIMARY KEY, gift_id TEXT NOT NULL, user_id TEXT NOT NULL, amount INTEGER NOT NULL, redeemed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(gift_id,user_id))").run();
+        const gift = await env.DB.prepare("SELECT * FROM gift_codes WHERE code_hash=? AND active=1").bind(await sha256(code.match(/.{1,4}/g).join("-"))).first();
+        if (!gift || gift.used_count >= gift.max_uses || (gift.expires_at && gift.expires_at <= now())) { await telegramSend(env,chatId,"این کد نامعتبر، منقضی یا تمام‌شده است.",menuKeyboard); return json({ok:true}); }
+        try {
+          const result = await env.DB.batch([
+            env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(linkedAccount.id),
+            env.DB.prepare("UPDATE gift_codes SET used_count=used_count+1 WHERE id=? AND active=1 AND used_count<max_uses AND (expires_at IS NULL OR expires_at>?)").bind(gift.id,now()),
+            env.DB.prepare("INSERT INTO gift_redemptions(id,gift_id,user_id,amount) SELECT ?,?,?,? WHERE changes()=1").bind(id(),gift.id,linkedAccount.id,gift.amount),
+            env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(gift.amount,now(),linkedAccount.id),
+            env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,gift.amount,"gift","دریافت کد هدیه از ربات تلگرام")
+          ]);
+          const used = Number(result?.[1]?.meta?.changes ?? result?.[1]?.changes ?? 0);
+          const inserted = Number(result?.[2]?.meta?.changes ?? result?.[2]?.changes ?? 0);
+          if (!used || !inserted) { await telegramSend(env,chatId,"ظرفیت این کد تمام شده یا دیگر فعال نیست.",menuKeyboard); return json({ok:true}); }
+          await telegramSend(env,chatId,"🎉 کد هدیه ثبت شد!\n"+gift.amount.toLocaleString("en-US")+" N Coin به کیف پولت اضافه شد.",menuKeyboard);
+        } catch (error) {
+          if (/UNIQUE constraint failed/i.test(String(error?.message||error))) await telegramSend(env,chatId,"این کد را قبلاً در حساب خودت استفاده کرده‌ای.",menuKeyboard);
+          else throw error;
+        }
+        return json({ok:true});
+      }
+      if (state === "support_message" && !textValue.startsWith("/")) {
+        const message = safeText(textValue,2000);
+        if (!message) { await telegramSend(env,chatId,"پیام خالی است؛ متن پیام را بفرست.",menuKeyboard); return json({ok:true}); }
+        const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM owner_messages WHERE user_id=? AND sender_role='user' AND created_at>?").bind(linkedAccount.id,new Date(Date.now()-60000).toISOString()).first();
+        if (Number(recent?.n||0) >= 5) { await clearState(); await telegramSend(env,chatId,"برای جلوگیری از اسپم، هر دقیقه حداکثر ۵ پیام می‌توانی بفرستی. کمی بعد دوباره تلاش کن.",menuKeyboard); return json({ok:true}); }
+        await env.DB.prepare("INSERT INTO owner_messages(id,user_id,sender_role,body) VALUES(?,?,'user',?)").bind(id(),linkedAccount.id,message).run();
+        await clearState();
+        await telegramSend(env,chatId,"✅ پیامت برای پشتیبانی ارسال شد. پاسخ در همین گفت‌وگو و بخش پشتیبانی سایت نمایش داده می‌شود.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (state === "buy_reward" && !textValue.startsWith("/")) {
+        const rewardId = safeText(textValue,80);
+        const reward = await env.DB.prepare("SELECT id,title,price FROM ncoin_rewards WHERE id=? AND active=1").bind(rewardId).first();
+        if (!reward) { await telegramSend(env,chatId,"شناسه جایزه پیدا نشد. شناسه را دقیقاً از فهرست فروشگاه کپی کن یا «لغو» را بفرست.",menuKeyboard); return json({ok:true}); }
+        await setState("confirm_buy",{reward_id:reward.id,title:reward.title,price:reward.price});
+        await telegramSend(env,chatId,"🛒 تأیید خرید\n\n"+reward.title+"\nهزینه: "+Number(reward.price).toLocaleString("en-US")+" N Coin\n\nبرای نهایی‌کردن بنویس «تأیید خرید»؛ برای انصراف «لغو».",menuKeyboard);
+        return json({ok:true});
+      }
+      if (state === "confirm_buy" && !textValue.startsWith("/")) {
+        if (["لغو","انصراف"].includes(textValue)) { await clearState(); await telegramSend(env,chatId,"خرید لغو شد.",menuKeyboard); return json({ok:true}); }
+        if (textValue !== "تأیید خرید") { await telegramSend(env,chatId,"برای ادامه «تأیید خرید» یا برای انصراف «لغو» را بفرست.",menuKeyboard); return json({ok:true}); }
+        const reward = await env.DB.prepare("SELECT id,title,price FROM ncoin_rewards WHERE id=? AND active=1").bind(statePayload.reward_id).first();
+        await clearState();
+        if (!reward) { await telegramSend(env,chatId,"این جایزه دیگر در دسترس نیست.",menuKeyboard); return json({ok:true}); }
+        const instant = {
+          "profile-badge":{key:"profile_badge",days:null},"profile-frame":{key:"profile_frame",days:null},"profile-theme":{key:"profile_theme",days:null},
+          "creator-spotlight":{key:"creator_spotlight",days:7},"creator-spotlight-plus":{key:"creator_spotlight_plus",days:14},
+          "featured-project":{key:"featured_project",days:1,project:true},"project-feature-24h":{key:"featured_project",days:1,project:true},
+          "project-feature-7d":{key:"featured_project",days:7,project:true},"project-promotion-month":{key:"featured_project",days:30,project:true}
+        }[reward.id] || null;
+        let project = null;
+        if (instant?.project) {
+          project = await env.DB.prepare("SELECT id,title,featured_until FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(linkedAccount.id).first();
+          if (!project) { await telegramSend(env,chatId,"برای فعال‌سازی این جایزه، ابتدا باید حداقل یک پروژه منتشرشده داشته باشی.",menuKeyboard); return json({ok:true}); }
+        }
+        if (instant && !instant.days) {
+          const already = await env.DB.prepare("SELECT id FROM ncoin_entitlements WHERE user_id=? AND entitlement_key=? AND status='active' AND expires_at IS NULL LIMIT 1").bind(linkedAccount.id,instant.key).first();
+          if (already) { await telegramSend(env,chatId,"این مزیت دائمی را قبلاً فعال کرده‌ای.",menuKeyboard); return json({ok:true}); }
+        }
+        const purchasedAt = now(), purchaseId = id();
+        const base = project?.featured_until && project.featured_until > purchasedAt ? Date.parse(project.featured_until) : Date.now();
+        const expiresAt = instant?.days ? new Date((Number.isFinite(base)?base:Date.now())+instant.days*86400000).toISOString() : null;
+        await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(linkedAccount.id).run();
+        const statements = [
+          env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,linkedAccount.id,reward.price),
+          env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) SELECT ?,?,?,?,? WHERE changes()=1").bind(purchaseId,linkedAccount.id,reward.id,reward.price,instant?"delivered":"pending"),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,-reward.price,"purchase","خرید از ربات تلگرام: "+reward.title),
+        ];
+        if (instant) statements.push(env.DB.prepare("INSERT INTO ncoin_entitlements(id,user_id,reward_id,entitlement_key,activated_at,expires_at,status,metadata_json) SELECT ?,?,?,?,?,?,'active',? WHERE changes()=1").bind(id(),linkedAccount.id,reward.id,instant.key,purchasedAt,expiresAt,project?JSON.stringify({project_id:project.id,project_title:project.title}):null));
+        if (project) statements.push(env.DB.prepare("UPDATE bots SET featured_until=? WHERE id=? AND uploader_id=? AND changes()=1").bind(expiresAt,project.id,linkedAccount.id));
+        const result = await env.DB.batch(statements);
+        const bought = Number(result?.[1]?.meta?.changes ?? result?.[1]?.changes ?? 0);
+        if (!bought) { await telegramSend(env,chatId,"موجودی N Coin برای این خرید کافی نیست.",menuKeyboard); return json({ok:true}); }
+        await audit(env,linkedAccount.id,"ncoin.reward.purchase.telegram","reward",reward.id,{purchase_id:purchaseId,price:reward.price,instant:!!instant});
+        if (instant) await notify(env,linkedAccount.id,"جایزه شما فعال شد ✨","«"+reward.title+"» از طریق ربات فعال شد.","success");
+        const balance = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first();
+        await telegramSend(env,chatId,(instant?"✨ جایزه با موفقیت فعال شد!":"✅ سفارش ثبت شد و در صف انجام قرار گرفت.")+"\n"+reward.title+"\nموجودی فعلی: "+Number(balance?.balance||0).toLocaleString("en-US")+" N Coin",menuKeyboard);
+        return json({ok:true});
+      }
+      if (["لغو","انصراف"].includes(userAction) && state) { await clearState(); await telegramSend(env,chatId,"عملیات لغو شد.",menuKeyboard); return json({ok:true}); }
+      if (commandName === "/account" || userAction === "👤 حساب من") {
+        const wallet = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first();
+        const [projects,submissions] = await Promise.all([
+          env.DB.prepare("SELECT COUNT(*) AS n FROM bots WHERE uploader_id=? AND status='published'").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT COUNT(*) AS n FROM submissions WHERE user_id=?").bind(linkedAccount.id).first()
+        ]);
+        await telegramSend(env,chatId,"👤 حساب کاربری\n\nشناسه: "+linkedAccount.public_id+"\nنام کاربری: @"+linkedAccount.username+"\nوضعیت: فعال\nپروژه‌های منتشرشده: "+Number(projects?.n||0)+"\nدرخواست‌های ثبت‌شده: "+Number(submissions?.n||0)+"\nموجودی: "+Number(wallet?.balance||0).toLocaleString("en-US")+" N Coin",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/wallet" || userAction === "💰 کیف پول") {
+        const wallet = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first();
+        const tx = await env.DB.prepare("SELECT amount,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 5").bind(linkedAccount.id).all();
+        const rows = (tx.results||[]).map(x=>(Number(x.amount)>0?"+":"")+Number(x.amount)+" | "+safeText(x.description,90)).join("\n");
+        const lucky = luckyIdReward(linkedAccount.public_id);
+        await telegramSend(env,chatId,"💰 کیف پول N Coin\n\nموجودی: "+Number(wallet?.balance||0).toLocaleString("en-US")+" N Coin\n\nآخرین تراکنش‌ها:\n"+(rows||"هنوز تراکنشی ثبت نشده.")+(lucky?"\n\n🎉 شناسه‌ات واجد جایزه "+lucky.reward+" N Coin است. برای دریافت «🎯 دریافت جایزه شناسه» را بزن.":""),{keyboard:[[{text:"🎯 دریافت جایزه شناسه"},{text:"🛍 فروشگاه جوایز"}],[{text:"🏠 منوی اصلی"}]],resize_keyboard:true});
+        return json({ok:true});
+      }
+      if (userAction === "🎯 دریافت جایزه شناسه") {
+        const lucky = luckyIdReward(linkedAccount.public_id);
+        if (!lucky) { await telegramSend(env,chatId,"شناسه‌ات در حال حاضر مشمول جایزه شناسه رُند نیست.",menuKeyboard); return json({ok:true}); }
+        const claim = await env.DB.batch([
+          env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(linkedAccount.id),
+          env.DB.prepare("INSERT OR IGNORE INTO ncoin_lucky_claims(user_id,pattern,reward) VALUES(?,?,?)").bind(linkedAccount.id,lucky.pattern,lucky.reward),
+          env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(lucky.reward,now(),linkedAccount.id),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,lucky.reward,"lucky_id","جایزه شناسه رُند از ربات تلگرام")
+        ]);
+        const changed = Number(claim?.[1]?.meta?.changes ?? claim?.[1]?.changes ?? 0);
+        if (!changed) { await telegramSend(env,chatId,"جایزه شناسه را قبلاً دریافت کرده‌ای.",menuKeyboard); return json({ok:true}); }
+        await telegramSend(env,chatId,"🎉 تبریک! "+lucky.reward+" N Coin به کیف پولت اضافه شد.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/projects" || userAction === "📦 پروژه‌های من") {
+        const {results=[]}=await env.DB.prepare("SELECT title,category,slug,published_at FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 10").bind(linkedAccount.id).all();
+        await telegramSend(env,chatId,"📦 پروژه‌های منتشرشده تو\n\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.title,90)+"\nدسته: "+safeText(x.category,40)+"\nشناسه: "+x.slug).join("\n\n")||"هنوز پروژه منتشرشده‌ای نداری."),menuKeyboard);
+        return json({ok:true});
+      }
+      if (userAction === "📨 درخواست‌های من") {
+        const {results=[]}=await env.DB.prepare("SELECT title,category,status,review_note,created_at FROM submissions WHERE user_id=? ORDER BY created_at DESC LIMIT 10").bind(linkedAccount.id).all();
+        const statusLabel = x=>({pending:"در انتظار بررسی",approved:"تأیید و منتشر شد",rejected:"رد شده"})[x]||x;
+        await telegramSend(env,chatId,"📨 درخواست‌های من\n\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.title,90)+"\n"+safeText(x.category,40)+" | "+statusLabel(x.status)+(x.review_note?"\nیادداشت: "+safeText(x.review_note,180):"")).join("\n\n")||"هنوز درخواستی ثبت نکرده‌ای.")+"\n\nبرای ارسال فایل ZIP جدید از داشبورد سایت استفاده کن.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/rewards" || userAction === "🛍 فروشگاه جوایز") {
+        const {results=[]}=await env.DB.prepare("SELECT id,title,description,price FROM ncoin_rewards WHERE active=1 ORDER BY sort_order,price LIMIT 22").all();
+        await setState("buy_reward");
+        await telegramSend(env,chatId,"🛍 فروشگاه N Coin\n\n"+results.map(x=>"• "+safeText(x.title,70)+" — "+Number(x.price).toLocaleString("en-US")+" N\nشناسه: "+x.id).join("\n\n")+"\n\nبرای انتخاب، شناسه جایزه را بفرست. قبل از کسر سکه، تأیید نهایی می‌گیری. برای خروج «لغو» را بفرست.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/gift" || userAction === "🎁 ثبت کد هدیه") {
+        await setState("gift_code");
+        await telegramSend(env,chatId,"🎁 کد هدیه ۱۲ کاراکتری را بفرست. خط تیره مهم نیست. برای انصراف «لغو» را بفرست.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/notifications" || userAction === "🔔 اعلان‌ها") {
+        const {results=[]}=await env.DB.prepare("SELECT id,title,body,type,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(linkedAccount.id).all();
+        const unread = results.filter(x=>!x.read_at).length;
+        await env.DB.prepare("UPDATE notifications SET read_at=? WHERE user_id=? AND read_at IS NULL").bind(now(),linkedAccount.id).run();
+        await telegramSend(env,chatId,"🔔 اعلان‌های اخیر"+(unread?" ("+unread+" خوانده‌نشده)":"")+"\n\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.title,90)+"\n"+safeText(x.body,240)).join("\n\n")||"اعلانی وجود ندارد."),menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/support" || userAction === "💬 پشتیبانی") {
+        const {results=[]}=await env.DB.prepare("SELECT sender_role,body,created_at FROM owner_messages WHERE user_id=? ORDER BY created_at DESC LIMIT 6").bind(linkedAccount.id).all();
+        await setState("support_message");
+        await telegramSend(env,chatId,"💬 گفت‌وگو با پشتیبانی\n\n"+(results.reverse().map(x=>(x.sender_role==="user"?"شما":"پشتیبانی")+": "+safeText(x.body,220)).join("\n\n")||"هنوز گفت‌وگویی ثبت نشده.")+"\n\nپیام جدیدت را در یک پیام بفرست. برای انصراف «لغو» را بفرست.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (userAction === "📣 اطلاعیه‌ها") {
+        const {results=[]}=await env.DB.prepare("SELECT title,body,kind,gift_code,gift_amount,created_at FROM announcements WHERE active=1 AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 5").bind(now()).all();
+        await telegramSend(env,chatId,"📣 اطلاعیه‌های BotForge\n\n"+(results.map(x=>"• "+safeText(x.title,90)+"\n"+safeText(x.body,300)+(x.kind==="gift"&&x.gift_code?"\nکد هدیه: "+x.gift_code+" ("+Number(x.gift_amount||0)+" N Coin)":"")).join("\n\n")||"اطلاعیه فعالی وجود ندارد."),menuKeyboard);
+        return json({ok:true});
+      }
+      if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
+        // Continue to the existing permission-checked manager interface below.
+      } else if (userAction === "❔ راهنما" || commandName === "/help") {
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\n/menu — منوی اصلی\n/account — اطلاعات حساب\n/projects — پروژه‌های منتشرشده تو\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        return json({ok:true});
+      } else if (userAction === "🔗 قطع اتصال تلگرام") {
+        await setState("confirm_unlink");
+        await telegramSend(env,chatId,"برای قطع اتصال، «تأیید قطع اتصال» را بفرست. برای لغو «لغو».",menuKeyboard);
+        return json({ok:true});
+      } else if (state === "confirm_unlink" && userAction === "تأیید قطع اتصال") {
+        await env.DB.prepare("DELETE FROM telegram_links WHERE user_id=?").bind(linkedAccount.id).run();
+        await clearState();
+        await telegramSend(env,chatId,"اتصال تلگرام قطع شد. برای اتصال دوباره از داخل سایت اقدام کن.");
+        return json({ok:true});
+      }
+    }
+  }
+
+  if (chatType !== "private") {
       await telegramSend(env, chatId, "برای اتصال حساب، گفت‌وگوی خصوصی ربات را باز کن و دستور /connect 1234 را بفرست.");
       return json({ok:true});
     }
