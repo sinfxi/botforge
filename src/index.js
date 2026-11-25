@@ -857,7 +857,7 @@ export default {
         try {
           asset = await Promise.race([
             read,
-            new Promise(resolve => { timeoutId = setTimeout(() => resolve(null), 1200); })
+            new Promise(resolve => { timeoutId = setTimeout(() => resolve(null), 250); })
           ]);
         } finally {
           if (timeoutId) clearTimeout(timeoutId);
