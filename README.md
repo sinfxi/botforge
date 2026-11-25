@@ -86,3 +86,10 @@ Sensitive account and purchase actions use a confirmation step; pending confirma
 User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/myreports`, `/trackreport`, `/track`, `/history`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
 
 After deploying an updated bot, an owner should open the BotForge admin panel and run **ثبت وب‌هوک در تلگرام** once to refresh Telegram's command list.
+
+
+## Latest Telegram and community improvements
+- Persistent Telegram chat keyboard now includes daily reward check-in and an account status summary.
+- `/checkin` safely claims the same daily N Coin streak reward as the website, with a database-level duplicate guard shared across both channels.
+- `/status` summarizes published projects, submission queue, wallet, active benefits, unread notifications and current check-in streak.
+- Community page now visualizes the last seven days of check-in progress with responsive streak tiles.
