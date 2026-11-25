@@ -600,8 +600,8 @@ async function handleTelegramWebhook(request, env) {
   const label = textValue;
   if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
   if (label === "❌ بستن منو") { await telegramSend(env,chatId,"منوی مدیریت بسته شد.",{remove_keyboard:true}); return json({ok:true}); }
-  const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🤖 پروژه‌ها","🧾 گزارش فعالیت","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
-    ["/stats","/pending","/users","/projects","/activity","/gifts","/site"].includes(commandName);
+  const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🤖 پروژه‌ها","🧾 گزارش فعالیت","🚩 گزارش‌های مشکل","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
+    ["/stats","/pending","/users","/projects","/activity","/reports","/resolve","/gifts","/site"].includes(commandName);
   if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. با /admin می‌توانی امکانات در دسترس را ببینی."); return json({ok:true}); }
   if (!isManager) { await telegramSend(env,chatId,"⛔ برای این بخش دسترسی فعالی نداری."); return json({ok:true}); }
 
