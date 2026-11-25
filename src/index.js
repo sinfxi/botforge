@@ -340,13 +340,11 @@ async function handleApi(request, env, url) {
   if (path === "/api/auth/login" && method === "POST") {
     if (!sameOrigin(request)) return json({ error: "درخواست نامعتبر است." }, 403);
     const body = await request.json().catch(() => null);
-    if (!body || typeof body.user_id !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری و رمز عبور را کامل وارد کن." }, 400);
+    if (!body || typeof body.user_id !== "string" || typeof body.username !== "string" || typeof body.password !== "string") return json({ error: "شناسه کاربری، نام کاربری و رمز عبور را کامل وارد کن." }, 400);
     const userId = normalizeUserId(body.user_id);
-    const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
-    if (!/^\d{4}$/.test(userId) || (username && !/^[a-z0-9_]{3,24}$/.test(username)) || body.password.length > 200) return json({ error: "شناسه کاربری باید دقیقاً ۴ رقم باشد." }, 400);
-    const user = username
-      ? await env.DB.prepare("SELECT id,password_hash,password_salt,status,role FROM users WHERE public_id = ? AND username = ?").bind(userId, username).first()
-      : await env.DB.prepare("SELECT id,password_hash,password_salt,status,role FROM users WHERE public_id = ?").bind(userId).first();
+    const username = body.username.trim().toLowerCase();
+    if (!/^\d{4}$/.test(userId) || !/^[a-z0-9_]{3,24}$/.test(username) || body.password.length > 200) return json({ error: "شناسه باید دقیقاً ۴ رقم و نام کاربری باید معتبر باشد." }, 400);
+    const user = await env.DB.prepare("SELECT id,password_hash,password_salt,status,role FROM users WHERE public_id = ? AND username = ?").bind(userId, username).first();
     if (!user || user.status !== "active" || await passwordHash(body.password, user.password_salt) !== user.password_hash) return json({ error: "شناسه کاربری، نام کاربری یا رمز عبور اشتباه است." }, 401);
     const token = `${id()}.${id()}`;
     const days = Math.min(30, Math.max(1, Number(env.SESSION_DAYS) || 14));
