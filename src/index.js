@@ -197,6 +197,7 @@ async function handleTelegramWebhook(request, env) {
         [{text:"📚 کاتالوگ پروژه‌ها"},{text:"⭐ ذخیره‌شده‌ها"}],
         [{text:"🔎 جستجوی کاربر"},{text:"⬇️ دانلود پروژه"}],
         [{text:"🧾 سفارش‌ها و مزایا"},{text:"🚩 گزارش مشکل"}],
+        [{text:"⬇️ تاریخچه دانلود"},{text:"🚩 گزارش‌های من"}],
         [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
         [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
         [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
@@ -444,7 +445,7 @@ async function handleTelegramWebhook(request, env) {
         await telegramSend(env,chatId,"🔎 وضعیت درخواست\n\nعنوان: "+safeText(row.title,100)+"\nدسته: "+safeText(row.category,50)+"\nوضعیت: "+status+"\nثبت: "+String(row.created_at||"").slice(0,16).replace("T"," ")+"\n"+(row.reviewed_at?"بررسی: "+String(row.reviewed_at).slice(0,16).replace("T"," ")+"\n":"")+(row.review_note?"یادداشت بررسی: "+safeText(row.review_note,300)+"\n":"")+"کد پیگیری: "+row.id,menuKeyboard);
         return json({ok:true});
       }
-      if (commandName === "/myreports") {
+      if (commandName === "/myreports" || userAction === "🚩 گزارش‌های من") {
         await env.DB.prepare("CREATE TABLE IF NOT EXISTS project_reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT, category TEXT NOT NULL DEFAULT 'other', message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
         const {results=[]}=await env.DB.prepare("SELECT id,bot_slug,message,status,created_at FROM project_reports WHERE user_id=? ORDER BY created_at DESC LIMIT 8").bind(linkedAccount.id).all();
         await telegramSend(env,chatId,"🚩 گزارش‌های من\n\n"+(results.map((x,i)=>(i+1)+". "+(x.bot_slug||"گزارش عمومی")+" · "+(x.status==="open"?"در انتظار بررسی":"بسته‌شده")+"\n"+safeText(x.message,180)+"\nکد: "+x.id+"\nپیگیری: /trackreport "+x.id).join("\n\n")||"هنوز گزارشی ثبت نکرده‌ای."),menuKeyboard);
