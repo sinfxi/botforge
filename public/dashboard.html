@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="فضای شخصی اعضای FXI BotForge">
   <title>حساب من | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=fxi-performance-20261125-r8">
+  <link rel="stylesheet" href="/styles.css?v=fxi-performance-20261125-r9">
   <link rel="icon" type="image/webp" href="/assets/cyrus-hero.webp">
 </head>
 <body class="page-dashboard">
@@ -32,6 +32,7 @@
       <div><span class="toolbar-kicker">فضای سازنده</span><b>همه چیز درباره پروژه‌هایت، یک‌جا</b><small>وضعیت بررسی، اعلان‌ها و آمار حساب را پیگیری کن.</small></div>
       <div class="toolbar-actions"><button id="user-refresh" class="quiet-button" type="button">↻ تازه‌سازی</button><button id="mark-all-read" class="quiet-button" type="button">✓ خواندن همه اعلان‌ها</button></div>
     </div>
+    <section class="panel account-security-card"><div class="account-security-copy"><span class="eyebrow">ACCOUNT SECURITY</span><h2>امنیت نشست‌های حساب</h2><p>اگر حسابت را روی دستگاه دیگری باز گذاشته‌ای، می‌توانی همه نشست‌های دیگر را ببندی؛ نشست فعلی‌ات باز می‌ماند.</p><small id="session-security-status" role="status">مدیریت امن نشست‌های ورود</small></div><button id="revoke-other-sessions" class="quiet-button" type="button">خروج از دستگاه‌های دیگر</button></section>
     <section class="creator-shortcuts"><a href="/community.html"><span>✦</span><b>جامعه FXI</b><small>شناسه‌ها، جایزه‌ها و ارتباط با سازنده‌ها</small><strong id="dashboard-coins">مشاهده کیف پول ←</strong></a><a href="/community.html#owner-chat-form"><span>✉</span><b>گفت‌وگو با مالک</b><small>پیشنهاد یا سؤال خودت را مستقیم مطرح کن</small><strong>شروع گفت‌وگو ←</strong></a><a href="/#explore"><span>⌘</span><b>اکتشاف پروژه‌ها</b><small>از پروژه‌های منتشرشده الهام بگیر</small><strong>رفتن به کتابخانه ←</strong></a></section>\n
     <section class="panel workspace-panel saved-projects-panel">
       <div class="panel-heading"><div><span class="eyebrow">YOUR BOOKMARKS</span><h2>پروژه‌های ذخیره‌شده</h2><p class="panel-subtitle">پروژه‌هایی که از کتابخانه نشان‌دار کرده‌ای، اینجا جمع می‌شوند.</p></div><span class="panel-mark">★</span></div>
@@ -224,6 +225,17 @@
     button.disabled = true;
     try { await api("/api/notifications/" + encodeURIComponent(button.dataset.read) + "/read", { method:"POST" }); await loadNotifications(); }
     catch (error) { button.disabled = false; showMessage("#page-message", error.message, "error"); }
+  });
+  $("#revoke-other-sessions").addEventListener("click", async event => {
+    const button=event.currentTarget,status=$("#session-security-status");
+    if(!confirm("از همه دستگاه‌ها و مرورگرهای دیگر خارج شوی؟ نشست فعلی باز می‌ماند.")) return;
+    button.disabled=true;button.textContent="در حال بستن نشست‌ها…";
+    try{
+      const result=await api("/api/auth/sessions/revoke-others",{method:"POST",body:"{}"});
+      status.textContent=result.revoked?faNumber(result.revoked)+" نشست دیگر بسته شد.":"نشست دیگری برای بستن وجود نداشت.";
+      showMessage("#page-message",status.textContent,"success");
+    }catch(error){status.textContent=error.message;showMessage("#page-message",error.message,"error");}
+    finally{button.disabled=false;button.textContent="خروج از دستگاه‌های دیگر";}
   });
   $("#logout").addEventListener("click", async () => {
     const button = $("#logout");
