@@ -455,13 +455,20 @@ async function handleApi(request, env, url) {
     const gift=await env.DB.prepare("SELECT * FROM gift_codes WHERE code_hash=? AND active=1").bind(await sha256(code.match(/.{1,4}/g).join("-"))).first();
     if(!gift || gift.used_count>=gift.max_uses || (gift.expires_at && gift.expires_at<=now()))return json({error:"کد هدیه نامعتبر، منقضی یا تمام‌شده است."},404);
     try {
-      await env.DB.prepare("INSERT INTO gift_redemptions(id,gift_id,user_id,amount) VALUES(?,?,?,?)").bind(id(),gift.id,auth.user.id,gift.amount).run();
-    } catch { return json({error:"این کد را قبلاً در حساب خودت استفاده کرده‌ای."},409); }
-    const used=await env.DB.prepare("UPDATE gift_codes SET used_count=used_count+1 WHERE id=? AND active=1 AND used_count<max_uses AND (expires_at IS NULL OR expires_at>?)").bind(gift.id,now()).run();
-    if(Number(used?.meta?.changes??used?.changes??0)!==1){await env.DB.prepare("DELETE FROM gift_redemptions WHERE gift_id=? AND user_id=?").bind(gift.id,auth.user.id).run();return json({error:"ظرفیت این کد به پایان رسیده است."},409);}
-    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
-    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(gift.amount,now(),auth.user.id).run();
-    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,gift.amount,"gift","دریافت کد هدیه").run();
+      const redemption = await env.DB.batch([
+        env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id),
+        env.DB.prepare("UPDATE gift_codes SET used_count=used_count+1 WHERE id=? AND active=1 AND used_count<max_uses AND (expires_at IS NULL OR expires_at>?)").bind(gift.id,now()),
+        env.DB.prepare("INSERT INTO gift_redemptions(id,gift_id,user_id,amount) SELECT ?,?,?,? WHERE changes()=1").bind(id(),gift.id,auth.user.id,gift.amount),
+        env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(gift.amount,now(),auth.user.id),
+        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),auth.user.id,gift.amount,"gift","دریافت کد هدیه")
+      ]);
+      const used=Number(redemption?.[1]?.meta?.changes??redemption?.[1]?.changes??0);
+      const inserted=Number(redemption?.[2]?.meta?.changes??redemption?.[2]?.changes??0);
+      if(!used||!inserted)return json({error:"ظرفیت این کد به پایان رسیده یا کد دیگر فعال نیست."},409);
+    } catch (error) {
+      if(/UNIQUE constraint failed/i.test(String(error?.message||error)))return json({error:"این کد را قبلاً در حساب خودت استفاده کرده‌ای."},409);
+      throw error;
+    }
     await audit(env,auth.user.id,"gift.redeem","gift",gift.id,{amount:gift.amount});
     return json({ok:true,amount:gift.amount,message:"کد هدیه با موفقیت ثبت شد."});
   }
@@ -474,11 +481,13 @@ async function handleApi(request, env, url) {
     const lucky = luckyIdReward(auth.user.public_id);
     if (!lucky) return json({ok:false,eligible:false,message:"شناسه‌ات در دسته شناسه‌های رُند جایزه‌دار نیست؛ اما می‌توانی با فعالیت در BotForge سکه جمع کنی."},200);
     const claimId = id();
-    const inserted = await env.DB.prepare("INSERT OR IGNORE INTO ncoin_lucky_claims(user_id,pattern,reward) VALUES(?,?,?)").bind(auth.user.id,lucky.pattern,lucky.reward).run();
-    const changes = Number(inserted?.meta?.changes ?? inserted?.changes ?? 0);
+    const claimResults = await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO ncoin_lucky_claims(user_id,pattern,reward) VALUES(?,?,?)").bind(auth.user.id,lucky.pattern,lucky.reward),
+      env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(lucky.reward,now(),auth.user.id),
+      env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(claimId,auth.user.id,lucky.reward,"lucky_id","جایزه شناسه رُند: "+lucky.title)
+    ]);
+    const changes = Number(claimResults?.[0]?.meta?.changes ?? claimResults?.[0]?.changes ?? 0);
     if (!changes) return json({ok:true,claimed:false,message:"جایزه شناسه‌ات قبلاً دریافت شده است."});
-    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(lucky.reward,now(),auth.user.id).run();
-    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(claimId,auth.user.id,lucky.reward,"lucky_id","جایزه شناسه رُند: "+lucky.title).run();
     await audit(env,auth.user.id,"ncoin.lucky.claim","user",auth.user.id,{pattern:lucky.pattern,reward:lucky.reward});
     return json({ok:true,claimed:true,reward:lucky.reward,pattern:lucky.pattern,balance:(await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first())?.balance||lucky.reward});
   }
