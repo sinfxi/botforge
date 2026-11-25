@@ -10,6 +10,10 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - Cloudflare KV-backed private ZIP submissions (5 MiB limit; KV is eventually consistent and intended for small/medium ZIP files), pending review, approve/reject workflow, published download endpoint, user notifications, and audit log.
 - One-time owner setup: the first visitor to submit a chosen 4-digit ID and password becomes the sole owner; the database enforces the single-owner rule.
 
+- Daily F COIN check-ins with consecutive-day streaks, once-per-day atomic rewards, and a weekly 200-coin milestone.
+- Expanded F COIN catalog with 34 active rewards, including instant profile/project perks and clearly marked manual services such as README polishing, performance review, security hardening plans, and launch kits.
+- Owner and manager audit controls now enforce the dedicated announcements permission, including announcement APIs.
+
 ## Stack
 - Cloudflare Workers + Static Assets
 - Cloudflare D1
@@ -38,7 +42,7 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - `/setup-owner.html` one-time owner bootstrap
 - `/dashboard.html` upload submissions, review status, notifications
 - `/admin.html` moderation queue, overview, user management, source management, audit log
-- `GET /api/bots`, `GET /api/bots/:slug/download`
+- `GET /api/bots`, `GET /api/bots/:slug/download`, `POST /api/community/checkin`
 - `POST /api/submissions`, `GET /api/my/submissions`
 - `GET /api/admin/overview`, `GET /api/admin/submissions`, `GET /api/admin/users`, `GET /api/admin/bots`
 - `POST /api/admin/submissions/:id/approve|reject`
