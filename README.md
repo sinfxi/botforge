@@ -32,7 +32,7 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 2. Confirm the D1 database ID and KV namespace ID in `wrangler.toml` match your Cloudflare account.
 3. Run `npx wrangler d1 migrations apply fxi-botforge-db --remote`.
 4. Deploy the Worker with `npx wrangler deploy` (or connect the repository through Workers Builds).
-5. Open `/setup-owner.html` before anyone else. Enter a 4-digit ID of your choice and any password (1–200 characters). The first successful submission becomes the sole owner; later setup attempts are rejected and the setup form closes.
+5. Open `/setup-owner.html` before anyone else. Enter a 4-digit ID, a username (3–24 letters/numbers/underscores), and a password (10–200 characters). The first successful submission becomes the sole owner; later setup attempts are rejected and the setup form closes.
 6. Sign in at `/login.html` using only the chosen 4-digit ID and password. The login form also accepts Persian or Arabic numerals.
 7. Check `/api/health`; it should report database connected and storage configured.
 
