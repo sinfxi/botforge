@@ -150,7 +150,7 @@ async function handleTelegramWebhook(request, env) {
   if (commandName === "/start") {
     const code = (parts[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
     if (!code) {
-      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب BotForge، وارد سایت شو و از بخش اتصال تلگرام کد یک‌بارمصرف بگیر؛ سپس اینجا بفرست: /start CODE");
+      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب سایتت، شناسه ۴ رقمی را این‌طور بفرست:\n/connect 1234\n\nبعد وارد همان حساب در سایت شو و درخواست اتصال را تأیید کن.");
       return json({ok:true});
     }
     const record = await env.DB.prepare("SELECT id,user_id FROM telegram_link_codes WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(await sha256(code),now()).first();
@@ -672,7 +672,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع و اتصال حساب"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
