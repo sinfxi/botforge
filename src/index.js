@@ -527,6 +527,17 @@ async function handleApi(request, env, url) {
   if (path.startsWith("/api/admin/")) {
     const admin = await requireAdmin(request, env);
     if (admin.response) return admin.response;
+    if (path === "/api/admin/telegram/register-webhook" && method === "POST") {
+      if (admin.user.role !== "owner") return json({error:"فقط مالک اصلی می‌تواند وب‌هوک ربات را ثبت کند."},403);
+      if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return json({error:"ابتدا TELEGRAM_BOT_TOKEN و TELEGRAM_WEBHOOK_SECRET را در Cloudflare Worker Secrets تنظیم کن."},503);
+      const base="https://api.telegram.org/bot"+env.TELEGRAM_BOT_TOKEN+"/";
+      const identity=await fetch(base+"getMe").then(r=>r.json()).catch(()=>null);
+      if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
+      const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
+      if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
+      await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook"});
+      return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
+    }
     const managerRoute = path.match(/^\/api\/admin\/managers(?:\/([0-9a-f-]+)\/(permissions|remove))?$/i);
     if (path === "/api/admin/managers" || managerRoute) {
       if (admin.user.role !== "owner") return json({ error: "فقط مالک اصلی می‌تواند مدیران را مدیریت کند." }, 403);
