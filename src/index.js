@@ -667,19 +667,24 @@ async function handleTelegramWebhook(request, env) {
     const slug=slugify(submission.title)+"-"+submission.id.slice(0,8),publishedKey="published/"+slug+".zip";
     const source=await env.FILES?.get(submission.object_key,"arrayBuffer");
     if(!source){await telegramSend(env,chatId,"فایل خصوصی درخواست پیدا نشد؛ از پنل سایت بررسی کن.",menu);return json({ok:true});}
-    const claimed=await env.DB.prepare("UPDATE submissions SET status='publishing',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(manager.id,now(),submission.id).run();
-    if(!Number(claimed.meta?.changes||0)){await telegramSend(env,chatId,"این درخواست هم‌زمان توسط مدیر دیگری در حال بررسی است.",menu);return json({ok:true});}
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS submission_review_locks (submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, manager_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    const lock=await env.DB.prepare("INSERT OR IGNORE INTO submission_review_locks(submission_id,manager_id) VALUES(?,?)").bind(submission.id,manager.id).run();
+    if(!Number(lock.meta?.changes||0)){await telegramSend(env,chatId,"این درخواست هم‌زمان توسط مدیر دیگری در حال بررسی است.",menu);return json({ok:true});}
     await env.FILES.put(publishedKey,source);
+    let insertedBot=false;
     try{
       await env.DB.prepare("INSERT INTO bots(id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES(?,?,?,?,?,?,?,?,?)").bind(id(),slug,submission.title,submission.description,submission.category,publishedKey,submission.original_filename,submission.file_size,submission.user_id).run();
-      const done=await env.DB.prepare("UPDATE submissions SET status='approved' WHERE id=? AND status='publishing' AND reviewed_by=?").bind(submission.id,manager.id).run();
-      if(!Number(done.meta?.changes||0))throw new Error("Submission claim lost.");
+      insertedBot=true;
+      const done=await env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(manager.id,now(),submission.id).run();
+      if(!Number(done.meta?.changes||0))throw new Error("Submission was reviewed concurrently.");
     }catch(error){
+      if(insertedBot)await env.DB.prepare("DELETE FROM bots WHERE slug=? AND uploader_id=? AND object_key=?").bind(slug,submission.user_id,publishedKey).run();
       await env.FILES.delete(publishedKey);
-      await env.DB.prepare("UPDATE submissions SET status='pending',reviewed_by=NULL,reviewed_at=NULL WHERE id=? AND status='publishing' AND reviewed_by=?").bind(submission.id,manager.id).run();
-      await telegramSend(env,chatId,"انتشار انجام نشد؛ درخواست به صف بررسی برگشت. از پنل سایت هم می‌توانی بررسی کنی.",menu);
+      await env.DB.prepare("DELETE FROM submission_review_locks WHERE submission_id=? AND manager_id=?").bind(submission.id,manager.id).run();
+      await telegramSend(env,chatId,"انتشار انجام نشد؛ درخواست در صف بررسی باقی ماند. از پنل سایت هم می‌توانی بررسی کنی.",menu);
       return json({ok:true});
     }
+    await env.DB.prepare("DELETE FROM submission_review_locks WHERE submission_id=? AND manager_id=?").bind(submission.id,manager.id).run();
     await env.FILES.delete(submission.object_key);
     await notify(env,submission.user_id,"سورس تو منتشر شد! 🎉","«"+safeText(submission.title,100)+"» پس از بررسی تأیید و در BotForge منتشر شد.","success");
     await audit(env,manager.id,"submission.approve.telegram","submission",submission.id,{slug});
