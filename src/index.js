@@ -472,7 +472,8 @@ async function handleApi(request, env, url) {
         if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
         const body=await request.json().catch(()=>null);
         const amount=Math.floor(Number(body?.amount)), maxUses=Math.floor(Number(body?.max_uses));
-        const expiry=body?.expires_at ? new Date(body.expires_at).toISOString() : null;
+        const expiryDate=body?.expires_at ? new Date(body.expires_at) : null;
+        const expiry=expiryDate && !Number.isNaN(expiryDate.getTime()) ? expiryDate.toISOString() : null;
         if(!Number.isInteger(amount)||amount<1||amount>1000000||!Number.isInteger(maxUses)||maxUses<1||maxUses>10000|| (body?.expires_at && (!expiry || expiry<=now())))return json({error:"مقدار سکه، تعداد استفاده یا تاریخ انقضا معتبر نیست."},400);
         const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
