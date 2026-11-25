@@ -787,7 +787,7 @@ async function handleApi(request, env, url) {
       env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT pattern,reward,claimed_at FROM ncoin_lucky_claims WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT id,title,description,price FROM ncoin_rewards WHERE active=1 ORDER BY sort_order,price").all(),
-      env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,r.title FROM ncoin_purchases p JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.user_id=? ORDER BY p.created_at DESC LIMIT 20").bind(auth.user.id).all(),
+      env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,r.title,d.title AS delivery_title,d.content AS delivery_content,d.created_at AS delivered_at FROM ncoin_purchases p JOIN ncoin_rewards r ON r.id=p.reward_id LEFT JOIN ncoin_deliveries d ON d.purchase_id=p.id WHERE p.user_id=? ORDER BY p.created_at DESC LIMIT 20").bind(auth.user.id).all(),
       env.DB.prepare("SELECT amount,kind,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(auth.user.id).all(),
       env.DB.prepare("SELECT id,entitlement_key,reward_id,activated_at,expires_at,status FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?) ORDER BY activated_at DESC").bind(auth.user.id,now()).all(),
       env.DB.prepare("SELECT checkin_date,streak,reward FROM ncoin_daily_checkins WHERE user_id=? ORDER BY checkin_date DESC LIMIT 7").bind(auth.user.id).all()
