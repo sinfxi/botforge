@@ -674,7 +674,7 @@ async function handleTelegramWebhook(request, env) {
     if (!target) { await telegramSend(env,chatId,"کاربری با این شناسه پیدا نشد.",menu); return json({ok:true}); }
     const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(target.id).first();
     const projects=await env.DB.prepare("SELECT COUNT(*) AS n FROM bots WHERE uploader_id=? AND status='published'").bind(target.id).first();
-    const detail="👤 اطلاعات کاربر\nشناسه: "+target.public_id+"\nنام کاربری: @"+safeText(target.username,32)+"\nوضعیت: "+(target.status==="active"?"فعال":"غیرفعال")+"\nنقش: "+(target.role==="owner"?"مدیر اصلی":target.role==="admin"?"مدیر":"کاربر")+"\nپروژه‌های منتشرشده: "+(projects?.n||0)+"\nموجودی N Coin: "+(wallet?.balance||0)+"\nعضویت: "+target.created_at;
+    const detail="👤 اطلاعات کاربر\nشناسه: "+target.public_id+"\nنام کاربری: @"+safeText(target.username,32)+"\nوضعیت: "+(target.status==="active"?"فعال":"غیرفعال")+"\nنقش: "+(target.role==="owner"?"حساب ویژه":target.role==="admin"?"مدیر":"کاربر")+"\nپروژه‌های منتشرشده: "+(projects?.n||0)+"\nموجودی N Coin: "+(wallet?.balance||0)+"\nعضویت: "+target.created_at;
     const controls=target.role==="owner" || (target.role==="admin" && manager.role!=="owner") ? menu : {keyboard:[[{text:target.status==="active"?"/user suspend "+target.public_id:"/user activate "+target.public_id}],[{text:"🏠 منوی مدیریت"}]],resize_keyboard:true,is_persistent:true};
     await telegramSend(env,chatId,detail,controls);
     return json({ok:true});
@@ -694,7 +694,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (label === "🛒 سفارش‌های N Coin" || commandName === "/orders") {
-    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ مدیریت سفارش‌ها فقط از حساب اصلی امکان‌پذیر است.",menu); return json({ok:true}); }
+    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ این بخش برای این حساب فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,u.public_id,u.username,r.title FROM ncoin_purchases p JOIN users u ON u.id=p.user_id JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.status NOT IN ('delivered','rejected') ORDER BY p.created_at ASC LIMIT 8").all();
     if (!results.length) { await telegramSend(env,chatId,"🛒 سفارش باز یا در انتظار انجامی وجود ندارد.",menu); return json({ok:true}); }
     const keyboard=[];
@@ -707,7 +707,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/purchase") {
-    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ این عملیات فقط برای حساب اصلی فعال است.",menu); return json({ok:true}); }
+    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ این بخش برای این حساب فعال نیست.",menu); return json({ok:true}); }
     const operation=(parts[1]||"").toLowerCase(), purchaseId=safeText(argsText.split(/\s+/)[1]||"",64);
     if (!["approve","deliver","reject"].includes(operation) || !/^[0-9a-f-]{36}$/i.test(purchaseId)) { await telegramSend(env,chatId,"درخواست سفارش معتبر نیست.",menu); return json({ok:true}); }
     const purchase=await env.DB.prepare("SELECT id,user_id,price,status FROM ncoin_purchases WHERE id=?").bind(purchaseId).first();
