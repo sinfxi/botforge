@@ -120,6 +120,7 @@ async function handleTelegramWebhook(request, env) {
         [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
         [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
         [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
+        [{text:"🔗 قطع اتصال تلگرام"}],
         [{text:"❔ راهنما"}]
       ], resize_keyboard:true, is_persistent:true
     };
@@ -216,7 +217,7 @@ async function handleTelegramWebhook(request, env) {
         const statements = [
           env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,linkedAccount.id,reward.price),
           env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) SELECT ?,?,?,?,? WHERE changes()=1").bind(purchaseId,linkedAccount.id,reward.id,reward.price,instant?"delivered":"pending"),
-          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,-reward.price,"purchase","خرید از ربات تلگرام: "+reward.title),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,-reward.price,"purchase","خرید از ربات تلگرام: "+reward.title),
         ];
         if (instant) statements.push(env.DB.prepare("INSERT INTO ncoin_entitlements(id,user_id,reward_id,entitlement_key,activated_at,expires_at,status,metadata_json) SELECT ?,?,?,?,?,?,'active',? WHERE changes()=1").bind(id(),linkedAccount.id,reward.id,instant.key,purchasedAt,expiresAt,project?JSON.stringify({project_id:project.id,project_title:project.title}):null));
         if (project) statements.push(env.DB.prepare("UPDATE bots SET featured_until=? WHERE id=? AND uploader_id=? AND changes()=1").bind(expiresAt,project.id,linkedAccount.id));
