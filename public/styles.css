@@ -425,9 +425,11 @@ body{perspective:1600px}
   filter:saturate(.98) contrast(1.04)
 }
 .brand-mark:after{
-  content:"";position:absolute;inset:0;border-radius:50%;
-  border:1px solid rgba(255,255,255,.28);pointer-events:none
+  content:"";position:absolute;inset:0;left:0;right:0;top:0;bottom:0;
+  width:auto;transform:none;background:none;transition:none;
+  border-radius:50%;border:1px solid rgba(255,255,255,.28);pointer-events:none
 }
+.brand:hover .brand-mark:after{left:0}
 .brand:hover .brand-mark{transform:translateY(-1px);box-shadow:0 10px 25px rgba(26,42,32,.22),0 0 0 3px rgba(190,151,78,.12)}
 .hero-cyrus-art{
   animation:none!important;transform:perspective(1200px) rotateY(-4deg) rotateX(1.5deg);
