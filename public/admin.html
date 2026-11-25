@@ -243,7 +243,7 @@
 
   async function loadAnnouncements() {
     const data=await api("/api/admin/announcements");
-    $("#announcement-list").innerHTML=(data.items||[]).length?(data.items||[]).map(item=>'<article class="data-row"><div class="row-main"><span class="row-icon announcement-row-icon">♡</span><div class="row-copy"><b>'+escapeHtml(item.title)+'</b><small>'+(item.kind==="gift"?"کد هدیه · ":"اطلاعیه · ")+date(item.created_at)+' · '+(item.active?"فعال":"غیرفعال")+'</small><small>'+escapeHtml(item.body)+'</small>'+(item.gift_code?'<code class="announcement-code-preview">'+escapeHtml(item.gift_code)+'</code>':'')+'</div></div>'+(item.active?'<button class="action-button reject" data-announcement-disable="'+escapeHtml(item.id)+'">غیرفعال‌سازی</button>':'')+'</article>').join(""):'<div class="empty-state"><b>هنوز اطلاع‌رسانی منتشر نشده</b></div>';
+    $("#announcement-list").innerHTML=(data.items||[]).length?(data.items||[]).map(item=>'<article class="data-row"><div class="row-main"><span class="row-icon announcement-row-icon">♡</span><div class="row-copy"><b>'+escapeHtml(item.title)+'</b><small>'+(item.kind==="gift"?"کد هدیه · ":"اطلاعیه · ")+date(item.created_at)+' · '+(item.active?"فعال":"غیرفعال")+'</small><small>'+escapeHtml(item.body)+'</small>'+(item.gift_code?'<code class="announcement-code-preview">'+escapeHtml(item.gift_code)+'</code><small>'+number(item.gift_amount)+' N Coin · '+number(item.gift_max_uses)+' بار قابل استفاده</small>':'')+'</div></div>'+(item.active?'<button class="action-button reject" data-announcement-disable="'+escapeHtml(item.id)+'">غیرفعال‌سازی</button>':'')+'</article>').join(""):'<div class="empty-state"><b>هنوز اطلاع‌رسانی منتشر نشده</b></div>';
   }
 
   async function load({ silent = false } = {}) {
