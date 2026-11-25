@@ -313,6 +313,8 @@ async function handleApi(request, env, url) {
   }
 
   if (path === "/api/public/stats" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
     try {
       const [projects, creators, downloads] = await Promise.all([
         env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE status='published'").first(),
@@ -327,6 +329,8 @@ async function handleApi(request, env, url) {
   }
 
   if (path === "/api/bots" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
     const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,original_filename,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
     return json({ items: results || [] }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
   }
@@ -394,6 +398,8 @@ async function handleApi(request, env, url) {
 
   const download = path.match(/^\/api\/bots\/([a-z0-9-]+)\/download$/);
   if (download && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
     const bot = await env.DB.prepare("SELECT title,object_key,original_filename FROM bots WHERE slug=? AND status='published'").bind(download[1]).first();
     if (!bot || !env.FILES) return json({ error: "فایل پیدا نشد." }, 404);
     const object = await env.FILES.get(bot.object_key, "arrayBuffer");
@@ -697,6 +703,17 @@ export default {
     const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html", "/community.html", "/owner-inbox.html"]);
     if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+
+    // The public homepage is only a preview. Every workspace page and its data
+    // require an authenticated account; redirect guests to registration/login.
+    const user = await currentUser(request, env);
+    const protectedPages = new Set(["/dashboard.html", "/admin.html", "/community.html", "/owner-inbox.html"]);
+    if (protectedPages.has(assetPath) && !user) {
+      return Response.redirect(new URL("/login.html?next=" + encodeURIComponent(assetPath), url), 302);
+    }
+    if (assetPath === "/app.js" && !user) {
+      return new Response("/* Sign in to access the BotForge catalog. */", { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+    }
 
     const cached = STATIC_ASSET_CACHE.get(assetPath);
     let asset = cached && cached.expiresAt > Date.now() ? cached.body : null;
