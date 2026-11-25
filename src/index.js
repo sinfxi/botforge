@@ -204,14 +204,15 @@ async function handleApi(request, env, url) {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
-    const [wallet, claim, rewards, purchases, transactions] = await Promise.all([
+    const [wallet, claim, rewards, purchases, transactions, entitlements] = await Promise.all([
       env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT pattern,reward,claimed_at FROM ncoin_lucky_claims WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT id,title,description,price FROM ncoin_rewards WHERE active=1 ORDER BY sort_order,price").all(),
       env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,r.title FROM ncoin_purchases p JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.user_id=? ORDER BY p.created_at DESC LIMIT 20").bind(auth.user.id).all(),
-      env.DB.prepare("SELECT amount,kind,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(auth.user.id).all()
+      env.DB.prepare("SELECT amount,kind,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(auth.user.id).all(),
+      env.DB.prepare("SELECT id,entitlement_key,reward_id,activated_at,expires_at,status FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?) ORDER BY activated_at DESC").bind(auth.user.id,now()).all()
     ]);
-    return json({ user_id:auth.user.public_id, username:auth.user.username, balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[] });
+    return json({ user_id:auth.user.public_id, username:auth.user.username, balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[], entitlements:entitlements.results||[] });
   }
 
   if (path === "/api/community/search" && method === "GET") {
@@ -221,8 +222,11 @@ async function handleApi(request, env, url) {
     if (!/^\d{4}$/.test(publicId)) return json({error:"شناسه باید دقیقاً ۴ رقم باشد."},400);
     const user = await env.DB.prepare("SELECT id,public_id,username,role,created_at FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
     if (!user) return json({error:"کاربری با این شناسه پیدا نشد."},404);
-    const projects = await env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first();
-    return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0)}});
+    const [projects, perks] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first(),
+      env.DB.prepare("SELECT entitlement_key,expires_at FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?)").bind(user.id,now()).all()
+    ]);
+    return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0),perks:perks.results||[]}});
   }
 
   if (path === "/api/community/gift/redeem" && method === "POST") {
@@ -272,22 +276,44 @@ async function handleApi(request, env, url) {
     const rewardId = safeText(body?.reward_id,80);
     const reward = await env.DB.prepare("SELECT id,title,price FROM ncoin_rewards WHERE id=? AND active=1").bind(rewardId).first();
     if (!reward) return json({error:"این جایزه در حال حاضر موجود نیست."},404);
+    const instant = {
+      "profile-badge": { key:"profile_badge", days:null },
+      "profile-frame": { key:"profile_frame", days:null },
+      "profile-theme": { key:"profile_theme", days:null },
+      "creator-spotlight": { key:"creator_spotlight", days:7 },
+      "creator-spotlight-plus": { key:"creator_spotlight_plus", days:14 },
+      "featured-project": { key:"featured_project", days:1, project:true },
+      "project-feature-24h": { key:"featured_project", days:1, project:true },
+      "project-feature-7d": { key:"featured_project", days:7, project:true },
+      "project-promotion-month": { key:"featured_project", days:30, project:true },
+      "priority-support-week": { key:"priority_support", days:7 }
+    }[reward.id] || null;
+    let featuredProject = null;
+    if (instant?.project) {
+      featuredProject = await env.DB.prepare("SELECT id,title FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
+      if (!featuredProject) return json({error:"برای فعال‌سازی این جایزه، ابتدا حداقل یک پروژه منتشرشده داشته باش."},400);
+    }
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
-    const purchaseId=id();
-    const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,now(),auth.user.id,reward.price).run();
+    const purchaseId=id(), purchasedAt=now();
+    const expiresAt = instant?.days ? new Date(Date.now()+instant.days*86400000).toISOString() : null;
+    const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,auth.user.id,reward.price).run();
     const changed = Number(update?.meta?.changes ?? update?.changes ?? 0);
     if (!changed) return json({error:"موجودی N Coin برای خرید این جایزه کافی نیست."},400);
     try {
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price) VALUES(?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,reward.price),
+      const statements = [
+        env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) VALUES(?,?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,reward.price,instant?"delivered":"pending"),
         env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,-reward.price,"purchase","خرید: "+reward.title)
-      ]);
+      ];
+      if (instant) statements.push(env.DB.prepare("INSERT INTO ncoin_entitlements(id,user_id,reward_id,entitlement_key,activated_at,expires_at,status,metadata_json) VALUES(?,?,?,?,?,?, 'active', ?)").bind(id(),auth.user.id,reward.id,instant.key,purchasedAt,expiresAt,featuredProject?JSON.stringify({project_id:featuredProject.id,project_title:featuredProject.title}):null));
+      if (featuredProject) statements.push(env.DB.prepare("UPDATE bots SET featured_until=? WHERE id=? AND uploader_id=?").bind(expiresAt,featuredProject.id,auth.user.id));
+      await env.DB.batch(statements);
     } catch (error) {
       await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(reward.price,now(),auth.user.id).run();
       throw error;
     }
-    await audit(env,auth.user.id,"ncoin.reward.purchase","reward",reward.id,{purchase_id:purchaseId,price:reward.price});
-    return json({ok:true,purchase_id:purchaseId,message:"درخواست خرید ثبت شد؛ مالک آن را بررسی می‌کند."},201);
+    await audit(env,auth.user.id,"ncoin.reward.purchase","reward",reward.id,{purchase_id:purchaseId,price:reward.price,instant:!!instant,entitlement:instant?.key||null});
+    if (instant) await notify(env,auth.user.id,"جایزه شما فعال شد ✨","«"+reward.title+"» بلافاصله فعال شد.","success");
+    return json({ok:true,purchase_id:purchaseId,activated:!!instant,message:instant?"خرید موفق بود؛ جایزه همین حالا فعال شد.":"سفارش ثبت شد و برای آماده‌سازی در صف قرار گرفت."},201);
   }
 
   if (path === "/api/community/owner-chat" && method === "GET") {
@@ -331,7 +357,7 @@ async function handleApi(request, env, url) {
   if (path === "/api/bots" && method === "GET") {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
-    const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,original_filename,file_size,published_at FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 100").all();
+    const { results } = await env.DB.prepare("SELECT id,slug,title,description,category,original_filename,file_size,published_at,featured_until FROM bots WHERE status='published' ORDER BY CASE WHEN featured_until IS NOT NULL AND featured_until>? THEN 0 ELSE 1 END, featured_until DESC, published_at DESC LIMIT 100").bind(now()).all();
     return json({ items: results || [] }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
   }
 
