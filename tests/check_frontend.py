@@ -5,13 +5,14 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["index.html", "login.html", "setup-owner.html", "dashboard.html", "admin.html"]
+PAGES = ["index.html", "login.html", "setup-owner.html", "dashboard.html", "admin.html", "community.html", "owner-inbox.html"]
 
 class PageInspector(HTMLParser):
     def __init__(self):
         super().__init__()
         self.ids = []
         self.scripts = []
+        self.asset_refs = []
         self._script = None
         self._external = False
 
@@ -19,6 +20,10 @@ class PageInspector(HTMLParser):
         attrs = dict(attrs)
         if "id" in attrs:
             self.ids.append(attrs["id"])
+        for key in ("src", "href"):
+            value = attrs.get(key, "").split("?", 1)[0]
+            if value.startswith("/assets/"):
+                self.asset_refs.append(value)
         if tag == "script":
             self._external = bool(attrs.get("src"))
             self._script = [] if not self._external else None
@@ -37,6 +42,11 @@ class PageInspector(HTMLParser):
 
 def main():
     checked_scripts = 0
+    worker_source = (ROOT / "src" / "index.js").read_text(encoding="utf-8")
+    if '"/assets/cyrus-hero.webp"' not in worker_source:
+        raise AssertionError("Worker static allowlist is missing the Cyrus logo/hero image")
+    if 'binaryAsset ? "arrayBuffer" : "text"' not in worker_source or '"image/webp"' not in worker_source:
+        raise AssertionError("Worker must serve WebP as binary image/webp, not UTF-8 text")
     with tempfile.TemporaryDirectory() as temp:
         for page in PAGES:
             path = ROOT / "public" / page
@@ -44,6 +54,9 @@ def main():
                 raise AssertionError(f"Missing page: {page}")
             parser = PageInspector()
             parser.feed(path.read_text(encoding="utf-8"))
+            for asset in parser.asset_refs:
+                if asset not in worker_source:
+                    raise AssertionError(f"{page}: static asset is not allowlisted by the Worker: {asset}")
             duplicates = sorted(value for value, count in Counter(parser.ids).items() if count > 1)
             if duplicates:
                 raise AssertionError(f"{page}: duplicate HTML id attributes: {', '.join(duplicates)}")
