@@ -889,7 +889,7 @@ async function handleTelegramWebhook(request, env) {
       await telegramSend(env,chatId,"درخواست با موفقیت رد شد و نتیجه برای کاربر ارسال شد.",menu);
       return json({ok:true});
     }
-    const slug=slugify(submission.title)+"-"+submission.id.slice(0,8),publishedKey="published/"+slug+".zip";
+    const slug=slugify(submission.title)+"-"+submission.id.slice(0,8),publishedKey="published/"+slug+"-"+id().slice(0,8)+".zip";
     const source=await env.FILES?.get(submission.object_key,"arrayBuffer");
     if(!source){await telegramSend(env,chatId,"فایل خصوصی درخواست پیدا نشد؛ از پنل سایت بررسی کن.",menu);return json({ok:true});}
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS submission_review_locks (submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, manager_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
@@ -1812,7 +1812,7 @@ async function handleApi(request, env, url) {
         return json({ ok: true });
       }
       const slug = `${slugify(submission.title)}-${submission.id.slice(0,8)}`;
-      const publishedKey = `published/${slug}.zip`;
+      const publishedKey = `published/${slug}-${id().slice(0,8)}.zip`;
       const source = await env.FILES?.get(submission.object_key, "arrayBuffer");
       if (!source) return json({ error: "فایل خصوصی درخواست پیدا نشد." }, 409);
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_project_rewards (submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL CHECK(amount=100), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
