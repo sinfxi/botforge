@@ -311,7 +311,7 @@ async function handleApi(request, env, url) {
       ]);
       const inserted = Number(results?.[0]?.meta?.changes ?? results?.[0]?.changes ?? 0);
       if (inserted !== 1) return json({ error: "حساب مالک قبلاً ساخته شده است؛ فقط اولین ثبت‌کننده می‌تواند مالک باشد." }, 409);
-      return json({ ok: true, user_id: publicId, message: "حساب مالک ساخته شد. با همین شناسه و رمز وارد شو." }, 201);
+      return json({ ok: true, user_id: publicId, username, message: "حساب مالک ساخته شد. برای ورود از شناسه، نام کاربری و رمز استفاده کن." }, 201);
     } catch (error) {
       console.error("Owner bootstrap failed:", requestId, error);
       const message = String(error?.message || error);
