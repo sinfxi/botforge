@@ -13,7 +13,7 @@
 </head>
 <body class="page-home guest-preview">
   <header class="topbar">
-    <a class="brand" href="/" aria-label="FXI BotForge"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a>
+    <a class="brand" href="/" aria-label="FXI BotForge"><span class="brand-mark"><img src="/assets/cyrus-hero.webp" alt=""></span><span>FXI <b>BotForge</b></span></a>
     <nav aria-label="ناوبری اصلی"><a href="#explore">اکتشاف پروژه‌ها</a><a href="/community.html">جامعه و N Coin</a><a href="#features">امکانات</a><a href="#how">مسیر انتشار</a></nav>
     <a class="button button-small" href="/login.html">ثبت‌نام / ورود <span>↗</span></a>
   </header>
@@ -29,11 +29,10 @@
           <div class="hero-note"><span class="note-icon">✓</span><span>نمای عمومی محدود · برای دیدن پروژه‌ها و امکانات، ابتدا حساب بساز</span></div>
         </div>
         <div class="hero-visual" aria-hidden="true">
-          <div class="visual-glow"></div><div class="visual-core"><span>F</span></div>
-          <div class="visual-card card-top"><span class="visual-card-icon">⌘</span><span><strong>کد، در جریان ساخت</strong><small>ابزارهایی برای شروع سریع‌تر</small></span></div>
-          <div class="visual-card card-bottom"><span class="visual-card-icon">✳</span><span><strong>جامعه سازندگان</strong><small>یادگیری و اشتراک تجربه</small></span></div>
-          <span class="sparkle sparkle-a">✧</span><span class="sparkle sparkle-b">✦</span>
-          <span class="hero-orbit-label">BUILD · SHARE · GROW</span>
+          <img class="hero-cyrus-art" src="/assets/cyrus-hero.webp" alt="">
+          <div class="visual-card card-top"><span class="visual-card-icon">✦</span><span><strong>الهام از تاریخ، ساختن آینده</strong><small>FXI BotForge · Build & Grow</small></span></div>
+          <div class="visual-card card-bottom"><span class="visual-card-icon">⌘</span><span><strong>جامعه سازندگان</strong><small>کد، ایده و تجربه در یک‌جا</small></span></div>
+          <span class="hero-orbit-label">CYRUS · BUILD · SHARE · GROW</span>
         </div>
       </div>
     </section>
@@ -65,7 +64,9 @@
         <article><span>03</span><div><h3>با دیگران به اشتراک بگذار</h3><p>پس از تأیید، پروژه در کتابخانه عمومی قرار می‌گیرد.</p></div></article>
       </div>
     </section>
+  <section class="announcement-slot" id="announcement-slot" aria-label="اطلاع‌رسانی عمومی" hidden><div id="announcement-feed" class="announcement-feed"></div></section>
   </main>
-  <footer><a class="brand" href="/"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a><span>ساخته‌شده برای کسانی که دوست دارند چیزهای تازه بسازند.</span></footer>
+  <footer><a class="brand" href="/"><span class="brand-mark"><img src="/assets/cyrus-hero.webp" alt=""></span><span>FXI <b>BotForge</b></span></a><span>ساخته‌شده برای کسانی که دوست دارند چیزهای تازه بسازند.</span></footer>
+<script>(function(){const slot=document.getElementById("announcement-slot"),feed=document.getElementById("announcement-feed"),dismissed=new Set();const esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));async function load(){try{const r=await fetch("/api/announcements",{cache:"no-store"}),d=await r.json(),items=(d.items||[]).filter(x=>!dismissed.has(x.id)).slice(0,3);if(!items.length){slot.hidden=true;return}feed.innerHTML=items.map(x=>'<article class="announcement-float '+(x.kind==="gift"?"is-gift":"is-notice")+'" data-announcement="'+esc(x.id)+'"><div class="announcement-content"><span class="announcement-kicker">'+(x.kind==="gift"?"هدیه ویژه اعضا":"اطلاعیه عمومی")+'</span><h3>'+esc(x.title)+'</h3><p>'+esc(x.body)+'</p>'+(x.gift_code?'<div class="announcement-gift-code"><code>'+esc(x.gift_code)+'</code><button type="button" data-copy-code="'+esc(x.id)+'">کپی کد</button></div>':'')+'</div><button class="announcement-dismiss" type="button" aria-label="بستن" data-dismiss="'+esc(x.id)+'">×</button></article>').join("");items.forEach(x=>{const el=feed.querySelector('[data-announcement="'+x.id+'"]');if(el&&x.image_url)el.style.setProperty("--announcement-image","url("+JSON.stringify(x.image_url)+")")});slot.hidden=false}catch(e){slot.hidden=true}}feed.addEventListener("click",async e=>{const close=e.target.closest("[data-dismiss]");if(close){dismissed.add(close.dataset.dismiss);load();return}const copy=e.target.closest("[data-copy-code]");if(copy){const code=copy.parentElement.querySelector("code")?.textContent||"";try{await navigator.clipboard.writeText(code);copy.textContent="کپی شد ✓"}catch{copy.textContent="کپی نشد"}}});load();setInterval(()=>{if(!document.hidden)load()},60000)})();</script>
 </body>
 </html>
