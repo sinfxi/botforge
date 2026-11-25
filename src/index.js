@@ -541,6 +541,9 @@ async function handleApi(request, env, url) {
       await env.FILES.delete(submission.object_key);
       await notify(env, submission.user_id, "سورس تو منتشر شد! 🎉", `«${submission.title}» پس از بررسی تأیید و در BotForge منتشر شد.`, "success");
       await audit(env, admin.user.id, "submission.approve", "submission", submission.id, { slug });
+      await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
+      await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+50,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
+      await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,50,"project_approved","پاداش انتشار پروژه تأییدشده").run();
       return json({ ok: true, slug });
     }
     if (path === "/api/admin/users" && method === "GET") {
