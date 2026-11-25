@@ -285,17 +285,21 @@ async function handleApi(request, env, url) {
       "featured-project": { key:"featured_project", days:1, project:true },
       "project-feature-24h": { key:"featured_project", days:1, project:true },
       "project-feature-7d": { key:"featured_project", days:7, project:true },
-      "project-promotion-month": { key:"featured_project", days:30, project:true },
-      "priority-support-week": { key:"priority_support", days:7 }
+      "project-promotion-month": { key:"featured_project", days:30, project:true }
     }[reward.id] || null;
     let featuredProject = null;
     if (instant?.project) {
-      featuredProject = await env.DB.prepare("SELECT id,title FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
+      featuredProject = await env.DB.prepare("SELECT id,title,featured_until FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
       if (!featuredProject) return json({error:"برای فعال‌سازی این جایزه، ابتدا حداقل یک پروژه منتشرشده داشته باش."},400);
+    }
+    if (instant && !instant.days) {
+      const already = await env.DB.prepare("SELECT id FROM ncoin_entitlements WHERE user_id=? AND entitlement_key=? AND status='active' AND expires_at IS NULL LIMIT 1").bind(auth.user.id,instant.key).first();
+      if (already) return json({error:"این مزیت دائمی را قبلاً فعال کرده‌ای."},409);
     }
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
     const purchaseId=id(), purchasedAt=now();
-    const expiresAt = instant?.days ? new Date(Date.now()+instant.days*86400000).toISOString() : null;
+    const featureBase = featuredProject?.featured_until && featuredProject.featured_until > purchasedAt ? Date.parse(featuredProject.featured_until) : Date.now();
+    const expiresAt = instant?.days ? new Date((Number.isFinite(featureBase)?featureBase:Date.now())+instant.days*86400000).toISOString() : null;
     const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,auth.user.id,reward.price).run();
     const changed = Number(update?.meta?.changes ?? update?.changes ?? 0);
     if (!changed) return json({error:"موجودی N Coin برای خرید این جایزه کافی نیست."},400);
