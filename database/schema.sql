@@ -85,3 +85,10 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, crea
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_single_owner ON users(role) WHERE role = 'owner';
+
+CREATE TABLE IF NOT EXISTS ncoin_project_rewards (
+  submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount = 100),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
