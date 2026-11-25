@@ -781,16 +781,20 @@ async function handleApi(request, env, url) {
   if (path === "/api/community/me" && method === "GET") {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_daily_checkins (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date TEXT NOT NULL, streak INTEGER NOT NULL, reward INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,checkin_date))").run();
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
-    const [wallet, claim, rewards, purchases, transactions, entitlements] = await Promise.all([
+    const [wallet, claim, rewards, purchases, transactions, entitlements, checkins] = await Promise.all([
       env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT pattern,reward,claimed_at FROM ncoin_lucky_claims WHERE user_id=?").bind(auth.user.id).first(),
       env.DB.prepare("SELECT id,title,description,price FROM ncoin_rewards WHERE active=1 ORDER BY sort_order,price").all(),
       env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,r.title FROM ncoin_purchases p JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.user_id=? ORDER BY p.created_at DESC LIMIT 20").bind(auth.user.id).all(),
       env.DB.prepare("SELECT amount,kind,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(auth.user.id).all(),
-      env.DB.prepare("SELECT id,entitlement_key,reward_id,activated_at,expires_at,status FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?) ORDER BY activated_at DESC").bind(auth.user.id,now()).all()
+      env.DB.prepare("SELECT id,entitlement_key,reward_id,activated_at,expires_at,status FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?) ORDER BY activated_at DESC").bind(auth.user.id,now()).all(),
+      env.DB.prepare("SELECT checkin_date,streak,reward FROM ncoin_daily_checkins WHERE user_id=? ORDER BY checkin_date DESC LIMIT 7").bind(auth.user.id).all()
     ]);
-    return json({ user_id:auth.user.public_id, username:auth.user.username, balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[], entitlements:entitlements.results||[] });
+    const today=new Date().toISOString().slice(0,10);
+    const checkinRows=checkins.results||[];
+    return json({ user_id:auth.user.public_id, username:auth.user.username, balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[], entitlements:entitlements.results||[], checkin:{claimed_today:checkinRows.some(x=>x.checkin_date===today),streak:Number(checkinRows[0]?.streak||0),last_date:checkinRows[0]?.checkin_date||null,history:checkinRows} });
   }
 
   if (path === "/api/community/search" && method === "GET") {
