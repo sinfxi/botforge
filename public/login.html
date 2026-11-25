@@ -77,15 +77,15 @@
     $("#heading").textContent = registerMode ? "حساب تازه بساز." : "خوش برگشتی.";
     $("#subheading").textContent = registerMode
       ? "برای ارسال و پیگیری پروژه‌هایت ثبت‌نام کن."
-      : "وارد حساب شو تا پروژه‌ها و درخواست‌هایت را مدیریت کنی.";
+      : "شناسه، نام کاربری و رمز عبورت را وارد کن.";
     button.innerHTML = registerMode ? "ساخت حساب <span>←</span>" : "ورود به حساب <span>←</span>";
     $("#switch-label").textContent = registerMode ? "قبلاً حساب داری؟" : "حساب کاربری نداری؟";
     $("#switch").textContent = registerMode ? "وارد شو" : "ثبت‌نام کن";
     password.autocomplete = registerMode ? "new-password" : "current-password";
     $("#user-id-field").hidden = registerMode;
     userId.required = !registerMode;
-    $("#username-field").hidden = !registerMode;
-    username.required = registerMode;
+    $("#username-field").hidden = false;
+    username.required = true;
     password.placeholder = registerMode ? "حداقل ۱۰ کاراکتر" : "رمز عبور حساب";
     clearNotice();
   }
@@ -95,7 +95,7 @@
     if (busy) return;
     clearNotice();
     const normalizedUsername = username.value.trim().toLowerCase();
-    if (registerMode && !/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+    if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
       showNotice("نام کاربری باید ۳ تا ۲۴ کاراکتر و شامل حروف انگلیسی، عدد یا _ باشد.", "error");
       username.focus();
       return;
@@ -123,7 +123,7 @@
         cache: "no-store",
         redirect: "error",
         headers: { "content-type": "application/json", "accept": "application/json" },
-        body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), password: password.value })
+        body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), username: normalizedUsername, password: password.value })
       };
       let response;
       try {
@@ -140,7 +140,7 @@
         username.value = normalizedUsername;
         password.value = "";
         userId.value = data.user_id || "";
-        showNotice("حساب ساخته شد. شناسه کاربری: " + (data.user_id || "—") + " — برای ورود همین شناسه و رمز را وارد کن.", "success");
+        showNotice("حساب ساخته شد. شناسه کاربری: " + (data.user_id || "—") + " — شناسه، نام کاربری و رمز را برای ورود نگه دار.", "success");
         password.focus();
       } else {
         location.replace(data.role === "owner" || data.role === "admin" ? "/admin.html" : "/dashboard.html");
