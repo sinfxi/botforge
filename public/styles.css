@@ -534,3 +534,9 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
 .daily-week-day.is-done{border-color:rgba(75,112,83,.24);background:linear-gradient(180deg,rgba(225,239,224,.78),rgba(255,255,255,.72));color:#46664d}
 .daily-week-day.is-done b{background:#557b5e;color:white;box-shadow:0 4px 12px rgba(66,102,73,.18)}
 @media(max-width:560px){.daily-week-strip{gap:4px}.daily-week-day{padding:8px 2px;border-radius:11px}.daily-week-day span{font-size:9px}.daily-week-day small{font-size:8px}.daily-week-day b{width:23px;height:23px}}
+
+
+/* Account session security panel */
+.account-security-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:18px 0 24px;padding:22px 24px;border:1px solid rgba(65,92,72,.12);border-radius:22px;background:linear-gradient(115deg,rgba(239,244,235,.88),rgba(255,255,255,.92));box-shadow:0 12px 36px rgba(40,62,46,.045)}
+.account-security-copy{min-width:0}.account-security-copy h2{margin:5px 0 7px;font-size:19px}.account-security-copy p{max-width:720px;margin:0 0 8px;color:var(--muted);font-size:13px;line-height:1.9}.account-security-copy small{color:#5c785f;font-size:11px}
+@media(max-width:620px){.account-security-card{align-items:stretch;flex-direction:column;padding:18px}.account-security-card button{width:100%}}
