@@ -184,9 +184,9 @@ async function handleTelegramWebhook(request, env) {
         ? await env.DB.prepare("SELECT u.public_id,u.username,u.status FROM telegram_links l JOIN users u ON u.id=l.user_id WHERE l.telegram_user_id=? LIMIT 1").bind(String(from.id)).first()
         : null;
       if (linked?.status === "active") {
-        await telegramSend(env, chatId, "سلام " + safeText(from.first_name || linked.username,40) + " 👋\\nمنوی FXI BotForge آماده است. از دکمه‌های پایین چت استفاده کن.", TELEGRAM_USER_MENU_KEYBOARD);
+        await telegramSend(env, chatId, "سلام " + safeText(from.first_name || linked.username,40) + " 👋\nمنوی FXI BotForge آماده است. از دکمه‌های پایین چت استفاده کن.", TELEGRAM_USER_MENU_KEYBOARD);
       } else {
-        await telegramSend(env, chatId, "سلام! 👋\\nبرای شروع، حسابت را با شناسه ۴ رقمی متصل کن:\\n/connect 1234\\n\\nبعد درخواست اتصال را از داخل همان حساب در سایت تأیید کن.", {keyboard:[[{text:"🔗 اتصال حساب"},{text:"❔ راهنما"}]],resize_keyboard:true,is_persistent:true});
+        await telegramSend(env, chatId, "سلام! 👋\nبرای شروع، حسابت را با شناسه ۴ رقمی متصل کن:\n/connect 1234\n\nبعد درخواست اتصال را از داخل همان حساب در سایت تأیید کن.", {keyboard:[[{text:"🔗 اتصال حساب"},{text:"❔ راهنما"}]],resize_keyboard:true,is_persistent:true});
       }
       return json({ok:true});
     }
@@ -199,7 +199,7 @@ async function handleTelegramWebhook(request, env) {
         env.DB.prepare("UPDATE telegram_link_codes SET used_at=? WHERE id=? AND used_at IS NULL").bind(now(),record.id)
       ]);
       const user = await env.DB.prepare("SELECT public_id,username FROM users WHERE id=?").bind(record.user_id).first();
-      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت متصل شد.\\nشناسه سایت: " + user.public_id + "\\nنام کاربری: @" + user.username + "\\n\\nمنوی دکمه‌ای پایین چت هم فعال شد؛ برای استفاده از امکانات، یکی از دکمه‌ها را انتخاب کن.", TELEGRAM_USER_MENU_KEYBOARD);
+      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت متصل شد.\nشناسه سایت: " + user.public_id + "\nنام کاربری: @" + user.username + "\n\nمنوی دکمه‌ای پایین چت هم فعال شد؛ برای استفاده از امکانات، یکی از دکمه‌ها را انتخاب کن.", TELEGRAM_USER_MENU_KEYBOARD);
     } catch (error) {
       console.error("Telegram account link failed:", error);
       await telegramSend(env, chatId, "اتصال انجام نشد؛ ممکن است این حساب تلگرام قبلاً به حساب دیگری وصل شده باشد.");
