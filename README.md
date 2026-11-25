@@ -71,11 +71,11 @@ The connected `@FxiCode_bot` account can manage the core user workspace without 
 - Browse and search the public project catalog, then download published project files directly in Telegram.
 - Submit a project ZIP from Telegram through a guided flow: title, description, category, rights confirmation, and ZIP document upload (5 MiB maximum).
 - Claim eligible one-time lucky-ID rewards, browse and purchase N Coin rewards with a confirmation step, and redeem gift codes.
-- Read notifications and announcements, message support, and unlink the Telegram account.
+- Track submission decisions with `/track`, view report status with `/myreports` and `/trackreport`, read notifications and announcements, message support, and unlink the Telegram account.
 - The existing permission-checked manager menu remains separate and is shown only to linked active manager accounts.
 
-Managers with the audit permission can review open project reports with `/reports` and close them with `/resolve <report-id>`; the reporter receives a notification. The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, saved-project list, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
+Managers with the submissions permission can review and publish submissions directly with `/approve <submission-id>` or reject with `/reject <submission-id> <reason>`. Managers with the audit permission can review open project reports with `/reports` and close them with `/resolve <report-id>`; the reporter receives a notification. The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, saved-project list, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
 
-User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
+User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/myreports`, `/trackreport`, `/track`, `/history`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
 
 After deploying an updated bot, an owner should open the BotForge admin panel and run **ثبت وب‌هوک در تلگرام** once to refresh Telegram's command list.
