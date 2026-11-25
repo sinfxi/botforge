@@ -622,7 +622,8 @@ async function handleTelegramWebhook(request, env) {
   const menu = {
     keyboard: [
       ...(can("submissions") ? [[{text:"📥 درخواست‌های جدید"}]] : []),
-      ...((can("users") || can("bots")) ? [[...(can("users") ? [{text:"👥 کاربران"}] : []), ...(can("bots") ? [{text:"🤖 پروژه‌ها"}] : [])]] : []),
+      ...((can("users") || can("bots")) ? [[...(can("users") ? [{text:"👥 کاربران"},{text:"🔎 جستجوی کاربر"}] : []), ...(can("bots") ? [{text:"🤖 پروژه‌ها"}] : [])]] : []),
+      ...(manager?.role === "owner" ? [[{text:"🛒 سفارش‌های N Coin"}]] : []),
       ...(can("audit") ? [[{text:"🧾 گزارش فعالیت"},{text:"🚩 گزارش‌های مشکل"}]] : []),
       ...(can("gifts") ? [[{text:"🎁 مدیریت هدایا"}]] : []),
       [[{text:"📊 آمار کلی"},{text:"🌐 پنل مدیریت"}]],
@@ -641,12 +642,103 @@ async function handleTelegramWebhook(request, env) {
   const label = textValue;
   if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
   if (label === "❌ بستن منو") { await telegramSend(env,chatId,"منوی مدیریت بسته شد.",{remove_keyboard:true}); return json({ok:true}); }
-  const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🤖 پروژه‌ها","🧾 گزارش فعالیت","🚩 گزارش‌های مشکل","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
-    ["/stats","/pending","/users","/projects","/activity","/reports","/resolve","/approve","/reject","/gifts","/site"].includes(commandName);
+  const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🔎 جستجوی کاربر","🤖 پروژه‌ها","🛒 سفارش‌های N Coin","🧾 گزارش فعالیت","🚩 گزارش‌های مشکل","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
+    ["/stats","/pending","/users","/lookup","/projects","/orders","/purchase","/archive","/activity","/reports","/resolve","/approve","/reject","/gifts","/site"].includes(commandName);
   if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. با /admin می‌توانی امکانات در دسترس را ببینی."); return json({ok:true}); }
   if (!isManager) { await telegramSend(env,chatId,"⛔ برای این بخش دسترسی فعالی نداری."); return json({ok:true}); }
 
 
+
+  // Interactive manager shortcuts. Reply-keyboard buttons send these same commands,
+  // so every action still passes the server-side capability and ownership checks.
+  const managerStateRow = await env.DB.prepare("SELECT state,payload_json FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).first();
+  let managerStatePayload = {};
+  try { managerStatePayload = JSON.parse(managerStateRow?.payload_json || "{}"); } catch {}
+  const setManagerState = async (state,payload=null) => env.DB.prepare("INSERT INTO telegram_bot_states(telegram_user_id,state,payload_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_user_id) DO UPDATE SET state=excluded.state,payload_json=excluded.payload_json,updated_at=excluded.updated_at")
+    .bind(String(from.id),state,payload?JSON.stringify(payload):null,now()).run();
+  const clearManagerState = async () => env.DB.prepare("DELETE FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).run();
+
+  if (label === "🔎 جستجوی کاربر" || commandName === "/lookup") {
+    if (!can("users")) { await telegramSend(env,chatId,"⛔ دسترسی مدیریت کاربران فعال نیست.",menu); return json({ok:true}); }
+    await setManagerState("manager_user_lookup");
+    await telegramSend(env,chatId,"شناسه ۴ رقمی کاربر را بفرست. برای لغو، «لغو» را ارسال کن.",menu);
+    return json({ok:true});
+  }
+  if (managerStateRow?.state === "manager_user_lookup" && !commandName.startsWith("/")) {
+    const publicId=normalizeUserId(textValue);
+    if (["لغو","انصراف"].includes(textValue)) { await clearManagerState(); await telegramSend(env,chatId,"جستجو لغو شد.",menu); return json({ok:true}); }
+    if (!/^\d{4}$/.test(publicId)) { await telegramSend(env,chatId,"شناسه باید دقیقاً ۴ رقم باشد. دوباره بفرست یا «لغو» را انتخاب کن."); return json({ok:true}); }
+    await clearManagerState();
+    const target=await env.DB.prepare("SELECT id,public_id,username,role,status,created_at FROM users WHERE public_id=?").bind(publicId).first();
+    if (!target) { await telegramSend(env,chatId,"کاربری با این شناسه پیدا نشد.",menu); return json({ok:true}); }
+    const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(target.id).first();
+    const projects=await env.DB.prepare("SELECT COUNT(*) AS n FROM bots WHERE uploader_id=? AND status='published'").bind(target.id).first();
+    const detail="👤 اطلاعات کاربر\nشناسه: "+target.public_id+"\nنام کاربری: @"+safeText(target.username,32)+"\nوضعیت: "+(target.status==="active"?"فعال":"غیرفعال")+"\nنقش: "+(target.role==="owner"?"مدیر اصلی":target.role==="admin"?"مدیر":"کاربر")+"\nپروژه‌های منتشرشده: "+(projects?.n||0)+"\nموجودی N Coin: "+(wallet?.balance||0)+"\nعضویت: "+target.created_at;
+    const controls=target.role==="owner" || (target.role==="admin" && manager.role!=="owner") ? {inline_keyboard:[]} : {keyboard:[[{text:target.status==="active"?"/user suspend "+target.public_id:"/user activate "+target.public_id}],[{text:"🏠 منوی مدیریت"}]],resize_keyboard:true,is_persistent:true};
+    await telegramSend(env,chatId,detail,controls);
+    return json({ok:true});
+  }
+  if (commandName === "/user") {
+    if (!can("users")) { await telegramSend(env,chatId,"⛔ دسترسی مدیریت کاربران فعال نیست.",menu); return json({ok:true}); }
+    const operation=(parts[1]||"").toLowerCase(), publicId=normalizeUserId((argsText.split(/\s+/)[1]||""));
+    if (!["suspend","activate"].includes(operation) || !/^\d{4}$/.test(publicId)) { await telegramSend(env,chatId,"فرمت: /user suspend 1234 یا /user activate 1234",menu); return json({ok:true}); }
+    const target=await env.DB.prepare("SELECT id,username,role,status FROM users WHERE public_id=?").bind(publicId).first();
+    if (!target) { await telegramSend(env,chatId,"کاربر پیدا نشد.",menu); return json({ok:true}); }
+    if (target.id===manager.id || target.role==="owner" || (target.role==="admin" && manager.role!=="owner")) { await telegramSend(env,chatId,"این حساب با سطح دسترسی فعلی قابل تغییر نیست.",menu); return json({ok:true}); }
+    const status=operation==="suspend"?"suspended":"active";
+    const changed=await env.DB.prepare("UPDATE users SET status=?,updated_at=? WHERE id=? AND status<>?").bind(status,now(),target.id,status).run();
+    if (status==="suspended") await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
+    await audit(env,manager.id,"user."+status,"user",target.id,{username:target.username,via:"telegram"});
+    await telegramSend(env,chatId,Number(changed.meta?.changes||0)?"وضعیت کاربر به‌روزرسانی شد.":"وضعیت کاربر از قبل همین بود.",menu);
+    return json({ok:true});
+  }
+  if (label === "🛒 سفارش‌های N Coin" || commandName === "/orders") {
+    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ مدیریت سفارش‌ها فقط از حساب اصلی امکان‌پذیر است.",menu); return json({ok:true}); }
+    const {results=[]}=await env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,u.public_id,u.username,r.title FROM ncoin_purchases p JOIN users u ON u.id=p.user_id JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.status NOT IN ('delivered','rejected') ORDER BY p.created_at ASC LIMIT 8").all();
+    if (!results.length) { await telegramSend(env,chatId,"🛒 سفارش باز یا در انتظار انجامی وجود ندارد.",menu); return json({ok:true}); }
+    const keyboard=[];
+    for (const p of results) {
+      keyboard.push([{text:"📦 "+safeText(p.title,34)+" · "+p.public_id+" · "+p.price+" N"}]);
+      keyboard.push([{text:"/purchase approve "+p.id},{text:"/purchase deliver "+p.id},{text:"/purchase reject "+p.id}]);
+    }
+    keyboard.push([{text:"🏠 منوی مدیریت"}]);
+    await telegramSend(env,chatId,"🛒 سفارش‌های در انتظار\n\n"+results.map((p,i)=>(i+1)+". "+safeText(p.title,70)+"\nکاربر: "+p.public_id+" (@"+safeText(p.username,24)+")\nهزینه: "+p.price+" N Coin\nوضعیت: "+p.status+"\nکد: "+p.id).join("\n\n"),{keyboard,resize_keyboard:true,is_persistent:true});
+    return json({ok:true});
+  }
+  if (commandName === "/purchase") {
+    if (manager.role!=="owner") { await telegramSend(env,chatId,"⛔ این عملیات فقط برای حساب اصلی فعال است.",menu); return json({ok:true}); }
+    const operation=(parts[1]||"").toLowerCase(), purchaseId=safeText(argsText.split(/\s+/)[1]||"",64);
+    if (!["approve","deliver","reject"].includes(operation) || !/^[0-9a-f-]{36}$/i.test(purchaseId)) { await telegramSend(env,chatId,"درخواست سفارش معتبر نیست.",menu); return json({ok:true}); }
+    const purchase=await env.DB.prepare("SELECT id,user_id,price,status FROM ncoin_purchases WHERE id=?").bind(purchaseId).first();
+    if (!purchase || ["rejected","delivered"].includes(purchase.status)) { await telegramSend(env,chatId,"سفارش پیدا نشد یا قبلاً نهایی شده است.",menu); return json({ok:true}); }
+    const nextStatus=operation==="deliver"?"delivered":operation==="approve"?"approved":"rejected";
+    if (operation==="reject") {
+      const results=await env.DB.batch([
+        env.DB.prepare("UPDATE ncoin_purchases SET status='rejected',updated_at=? WHERE id=? AND status NOT IN ('rejected','delivered')").bind(now(),purchaseId),
+        env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(purchase.price,now(),purchase.user_id),
+        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),purchase.user_id,purchase.price,"refund","بازگشت وجه سفارش ردشده")
+      ]);
+      if (!Number(results?.[0]?.meta?.changes??results?.[0]?.changes??0)) { await telegramSend(env,chatId,"این سفارش هم‌زمان توسط عملیات دیگری نهایی شد.",menu); return json({ok:true}); }
+    } else {
+      const changed=await env.DB.prepare("UPDATE ncoin_purchases SET status=?,updated_at=? WHERE id=? AND status NOT IN ('rejected','delivered')").bind(nextStatus,now(),purchaseId).run();
+      if (!Number(changed.meta?.changes||0)) { await telegramSend(env,chatId,"این سفارش هم‌زمان توسط عملیات دیگری نهایی شد.",menu); return json({ok:true}); }
+    }
+    await notify(env,purchase.user_id,"وضعیت سفارش N Coin تغییر کرد",operation==="reject"?"سفارش رد شد و مبلغ به کیف پول برگشت.":operation==="approve"?"سفارش تأیید شد و در صف انجام قرار گرفت.":"سفارش به‌عنوان تحویل‌شده ثبت شد.","info");
+    await audit(env,manager.id,"ncoin.purchase."+operation,"ncoin_purchase",purchaseId,{via:"telegram"});
+    await telegramSend(env,chatId,"وضعیت سفارش با موفقیت به‌روزرسانی شد.",menu);
+    return json({ok:true});
+  }
+  if (commandName === "/archive") {
+    if (!can("bots")) { await telegramSend(env,chatId,"⛔ دسترسی مدیریت پروژه‌ها فعال نیست.",menu); return json({ok:true}); }
+    const botId=safeText(parts[1]||"",64);
+    const bot=await env.DB.prepare("SELECT id,title,object_key FROM bots WHERE id=? AND status='published'").bind(botId).first();
+    if (!bot) { await telegramSend(env,chatId,"پروژه پیدا نشد یا قبلاً بایگانی شده است.",menu); return json({ok:true}); }
+    await env.DB.prepare("UPDATE bots SET status='archived' WHERE id=? AND status='published'").bind(bot.id).run();
+    await env.FILES?.delete(bot.object_key);
+    await audit(env,manager.id,"bot.archive.telegram","bot",bot.id,{title:bot.title});
+    await telegramSend(env,chatId,"پروژه «"+safeText(bot.title,90)+"» بایگانی شد.",menu);
+    return json({ok:true});
+  }
 
   if (commandName === "/approve" || commandName === "/reject") {
     if (!can("submissions")) { await telegramSend(env,chatId,"⛔ دسترسی بررسی درخواست‌ها برای حسابت فعال نیست.",menu); return json({ok:true}); }
@@ -728,7 +820,8 @@ async function handleTelegramWebhook(request, env) {
     if (!can("submissions")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
     const {results=[]}=await env.DB.prepare("SELECT id,title,category FROM submissions WHERE status='pending' ORDER BY created_at ASC LIMIT 8").all();
     const body=results.length?results.map((x,i)=>(i+1)+". "+safeText(x.title,90)+" | "+safeText(x.category,40)+"\nکد: "+x.id).join("\n\n"):"درخواست بررسی‌نشده‌ای وجود ندارد.";
-    await telegramSend(env,chatId,"📥 درخواست‌های جدید\n\n"+body+"\n\nبرای تأیید یا رد، پنل را باز کن:\nhttps://botforge.99lq9ohj-kfshcd.workers.dev/admin.html",menu);
+    const reviewKeyboard=results.length?{keyboard:results.flatMap(x=>[[{text:"/approve "+x.id},{text:"/reject "+x.id}]]).concat([[{text:"🏠 منوی مدیریت"}]]),resize_keyboard:true,is_persistent:true}:menu;
+    await telegramSend(env,chatId,"📥 درخواست‌های جدید\n\n"+body+"\n\nبرای تصمیم‌گیری از دکمه‌های زیر استفاده کن.",reviewKeyboard);
     return json({ok:true});
   }
   if (label === "👥 کاربران" || commandName === "/users") {
@@ -739,8 +832,9 @@ async function handleTelegramWebhook(request, env) {
   }
   if (label === "🤖 پروژه‌ها" || commandName === "/projects") {
     if (!can("bots")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
-    const {results=[]}=await env.DB.prepare("SELECT title,category,slug FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 10").all();
-    await telegramSend(env,chatId,"🤖 پروژه‌های منتشرشده\n\n"+(results.map(x=>"• "+safeText(x.title,90)+" | "+safeText(x.category,40)+"\n"+x.slug).join("\n\n")||"پروژه‌ای منتشر نشده است."),menu);
+    const {results=[]}=await env.DB.prepare("SELECT id,title,category,slug FROM bots WHERE status='published' ORDER BY published_at DESC LIMIT 8").all();
+    const projectKeyboard=results.length?{keyboard:results.map(x=>[{text:"/archive "+x.id}]).concat([[{text:"🏠 منوی مدیریت"}]]),resize_keyboard:true,is_persistent:true}:menu;
+    await telegramSend(env,chatId,"🤖 پروژه‌های منتشرشده\n\n"+(results.map(x=>"• "+safeText(x.title,90)+" | "+safeText(x.category,40)+"\nشناسه: "+x.id+"\nکد: "+x.slug).join("\n\n")||"پروژه‌ای منتشر نشده است.")+"\n\nبرای بایگانی از دکمه هر پروژه استفاده کن.",projectKeyboard);
     return json({ok:true});
   }
   if (label === "🧾 گزارش فعالیت" || commandName === "/activity") {
