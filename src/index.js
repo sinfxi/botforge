@@ -639,10 +639,46 @@ async function handleTelegramWebhook(request, env) {
   if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
   if (label === "❌ بستن منو") { await telegramSend(env,chatId,"منوی مدیریت بسته شد.",{remove_keyboard:true}); return json({ok:true}); }
   const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🤖 پروژه‌ها","🧾 گزارش فعالیت","🚩 گزارش‌های مشکل","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
-    ["/stats","/pending","/users","/projects","/activity","/reports","/resolve","/gifts","/site"].includes(commandName);
+    ["/stats","/pending","/users","/projects","/activity","/reports","/resolve","/approve","/reject","/gifts","/site"].includes(commandName);
   if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. با /admin می‌توانی امکانات در دسترس را ببینی."); return json({ok:true}); }
   if (!isManager) { await telegramSend(env,chatId,"⛔ برای این بخش دسترسی فعالی نداری."); return json({ok:true}); }
 
+
+
+  if (commandName === "/approve" || commandName === "/reject") {
+    if (!can("submissions")) { await telegramSend(env,chatId,"⛔ دسترسی بررسی درخواست‌ها برای حسابت فعال نیست.",menu); return json({ok:true}); }
+    const submissionId=safeText(parts[1]||"",64);
+    if(!/^[0-9a-f-]{36}$/i.test(submissionId)){await telegramSend(env,chatId,"کد کامل درخواست را وارد کن. نمونه: /approve UUID یا /reject UUID دلیل",menu);return json({ok:true});}
+    const submission=await env.DB.prepare("SELECT * FROM submissions WHERE id=? AND status='pending'").bind(submissionId).first();
+    if(!submission){await telegramSend(env,chatId,"درخواست پیدا نشد یا قبلاً بررسی شده است.",menu);return json({ok:true});}
+    if(commandName==="/reject"){
+      const note=safeText(textValue.replace(/^\/reject(?:@\w+)?\s+\S+\s*/i,""),500)||"درخواست پس از بررسی تأیید نشد.";
+      const changed=await env.DB.prepare("UPDATE submissions SET status='rejected',review_note=?,reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(note,manager.id,now(),submission.id).run();
+      if(!Number(changed.meta?.changes||0)){await telegramSend(env,chatId,"این درخواست هم‌زمان توسط مدیر دیگری بررسی شده است.",menu);return json({ok:true});}
+      await env.FILES?.delete(submission.object_key);
+      await notify(env,submission.user_id,"نتیجه بررسی سورس",note,"warning");
+      await audit(env,manager.id,"submission.reject.telegram","submission",submission.id);
+      await telegramSend(env,chatId,"درخواست با موفقیت رد شد و نتیجه برای کاربر ارسال شد.",menu);
+      return json({ok:true});
+    }
+    const slug=slugify(submission.title)+"-"+submission.id.slice(0,8),publishedKey="published/"+slug+".zip";
+    const source=await env.FILES?.get(submission.object_key,"arrayBuffer");
+    if(!source){await telegramSend(env,chatId,"فایل خصوصی درخواست پیدا نشد؛ از پنل سایت بررسی کن.",menu);return json({ok:true});}
+    await env.FILES.put(publishedKey,source);
+    try{
+      await env.DB.prepare("INSERT INTO bots(id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES(?,?,?,?,?,?,?,?,?)").bind(id(),slug,submission.title,submission.description,submission.category,publishedKey,submission.original_filename,submission.file_size,submission.user_id).run();
+      const changed=await env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(manager.id,now(),submission.id).run();
+      if(!Number(changed.meta?.changes||0))throw new Error("Submission was reviewed concurrently.");
+    }catch(error){await env.FILES.delete(publishedKey);await telegramSend(env,chatId,"انتشار انجام نشد؛ ممکن است درخواست هم‌زمان بررسی شده باشد. از پنل سایت بررسی کن.",menu);return json({ok:true});}
+    await env.FILES.delete(submission.object_key);
+    await notify(env,submission.user_id,"سورس تو منتشر شد! 🎉","«"+safeText(submission.title,100)+"» پس از بررسی تأیید و در BotForge منتشر شد.","success");
+    await audit(env,manager.id,"submission.approve.telegram","submission",submission.id,{slug});
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
+    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+50,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
+    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,50,"project_approved","پاداش انتشار پروژه تأییدشده").run();
+    await telegramSend(env,chatId,"🎉 پروژه تأیید و منتشر شد.\nعنوان: "+safeText(submission.title,100)+"\nشناسه انتشار: "+slug+"\nپاداش ۵۰ N Coin برای صاحب پروژه ثبت شد.",menu);
+    return json({ok:true});
+  }
 
   if (label === "🚩 گزارش‌های مشکل" || commandName === "/reports") {
     if (!can("audit")) { await telegramSend(env,chatId,"⛔ دسترسی این بخش برای حسابت فعال نیست.",menu); return json({ok:true}); }
@@ -1281,7 +1317,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"account",description:"اطلاعات حساب"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"favorites",description:"پروژه‌های ذخیره‌شده"},{command:"save",description:"ذخیره پروژه"},{command:"unsave",description:"حذف پروژه ذخیره‌شده"},{command:"report",description:"گزارش مشکل پروژه"},{command:"myreports",description:"گزارش‌های من"},{command:"trackreport",description:"پیگیری گزارش"},{command:"track",description:"پیگیری درخواست انتشار"},{command:"history",description:"تاریخچه دانلود"},{command:"reports",description:"گزارش‌های باز (مدیران)"},{command:"resolve",description:"بستن گزارش (مدیران)"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"account",description:"اطلاعات حساب"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"favorites",description:"پروژه‌های ذخیره‌شده"},{command:"save",description:"ذخیره پروژه"},{command:"unsave",description:"حذف پروژه ذخیره‌شده"},{command:"report",description:"گزارش مشکل پروژه"},{command:"myreports",description:"گزارش‌های من"},{command:"trackreport",description:"پیگیری گزارش"},{command:"track",description:"پیگیری درخواست انتشار"},{command:"history",description:"تاریخچه دانلود"},{command:"approve",description:"تأیید درخواست (مدیر)"},{command:"reject",description:"رد درخواست (مدیر)"},{command:"reports",description:"گزارش‌های باز (مدیران)"},{command:"resolve",description:"بستن گزارش (مدیران)"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
