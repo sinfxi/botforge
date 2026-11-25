@@ -675,7 +675,7 @@ async function handleTelegramWebhook(request, env) {
     const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(target.id).first();
     const projects=await env.DB.prepare("SELECT COUNT(*) AS n FROM bots WHERE uploader_id=? AND status='published'").bind(target.id).first();
     const detail="👤 اطلاعات کاربر\nشناسه: "+target.public_id+"\nنام کاربری: @"+safeText(target.username,32)+"\nوضعیت: "+(target.status==="active"?"فعال":"غیرفعال")+"\nنقش: "+(target.role==="owner"?"مدیر اصلی":target.role==="admin"?"مدیر":"کاربر")+"\nپروژه‌های منتشرشده: "+(projects?.n||0)+"\nموجودی N Coin: "+(wallet?.balance||0)+"\nعضویت: "+target.created_at;
-    const controls=target.role==="owner" || (target.role==="admin" && manager.role!=="owner") ? {inline_keyboard:[]} : {keyboard:[[{text:target.status==="active"?"/user suspend "+target.public_id:"/user activate "+target.public_id}],[{text:"🏠 منوی مدیریت"}]],resize_keyboard:true,is_persistent:true};
+    const controls=target.role==="owner" || (target.role==="admin" && manager.role!=="owner") ? menu : {keyboard:[[{text:target.status==="active"?"/user suspend "+target.public_id:"/user activate "+target.public_id}],[{text:"🏠 منوی مدیریت"}]],resize_keyboard:true,is_persistent:true};
     await telegramSend(env,chatId,detail,controls);
     return json({ok:true});
   }
