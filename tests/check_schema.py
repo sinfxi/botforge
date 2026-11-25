@@ -4,7 +4,7 @@ import sqlite3
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "database" / "migrations"
 SCHEMA = ROOT / "database" / "schema.sql"
-EXPECTED_TABLES = {"users", "sessions", "bots", "submissions", "notifications", "audit_logs"}
+EXPECTED_TABLES = {"users", "sessions", "bots", "submissions", "notifications", "audit_logs", "ncoin_project_rewards"}
 EXPECTED_USER_COLUMNS = {"id", "public_id", "email", "username", "password_hash", "password_salt", "role", "status", "permissions_json"}
 
 def inspect(label: str, connection: sqlite3.Connection) -> None:
@@ -21,6 +21,12 @@ def inspect(label: str, connection: sqlite3.Connection) -> None:
         raise AssertionError(f"{label}: public_id must be indexed uniquely")
     if not any("username" in row[1] for row in connection.execute("PRAGMA index_list(users)")):
         raise AssertionError(f"{label}: username must be indexed uniquely")
+    reward_columns = {row[1] for row in connection.execute("PRAGMA table_info(ncoin_project_rewards)")}
+    if not {"submission_id", "user_id", "amount", "created_at"}.issubset(reward_columns):
+        raise AssertionError(f"{label}: project reward ledger columns are incomplete")
+    reward_pk = next((row for row in connection.execute("PRAGMA table_info(ncoin_project_rewards)") if row[1] == "submission_id"), None)
+    if not reward_pk or reward_pk[5] != 1:
+        raise AssertionError(f"{label}: submission_id must be the unique reward ledger key")
     owner_index = connection.execute("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_users_single_owner'").fetchone()
     if not owner_index or "WHERE role = 'owner'" not in owner_index[0]:
         raise AssertionError(f"{label}: a partial unique index must enforce one owner")
