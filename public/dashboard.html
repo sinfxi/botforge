@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="فضای شخصی اعضای FXI BotForge">
   <title>حساب من | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=fcoin-refresh-20261125">
+  <link rel="stylesheet" href="/styles.css?v=fcoin-wallet-refresh-20261125">
   <link rel="icon" type="image/webp" href="/assets/cyrus-hero.webp">
 </head>
 <body class="page-dashboard">
@@ -121,6 +121,11 @@
     submissions = Array.isArray(data.items) ? data.items : [];
     renderSubmissions();
   }
+  async function loadWallet() {
+    const data = await api("/api/community/me");
+    const target = $("#dashboard-coins");
+    if (target) target.textContent = faNumber(data.balance) + " F COIN · مشاهده کیف پول ←";
+  }
   async function loadNotifications() {
     const data = await api("/api/notifications");
     window.botforgeNotifications = Array.isArray(data.items) ? data.items : [];
@@ -144,7 +149,7 @@
       $("#avatar").textContent = currentUser.role === "owner" ? "O" : currentUser.role === "admin" ? "M" : "U";
       $("#role-label").textContent = currentUser.role === "owner" ? "مالک اصلی BotForge" : currentUser.role === "admin" ? "مدیر BotForge" : "عضو BotForge";
       if (["admin","owner"].includes(currentUser.role)) $("#admin-link").hidden = false;
-      const results = await Promise.allSettled([loadSubmissions(), loadNotifications()]);
+      const results = await Promise.allSettled([loadSubmissions(), loadNotifications(), loadWallet()]);
       const failed = results.some(result => result.status === "rejected");
       showMessage("#page-message", failed ? "حساب فعال است، اما بارگذاری بخشی از اطلاعات ناموفق بود. صفحه را دوباره بارگذاری کن." : "خوش آمدی؛ فضای شخصی تو آماده است.", failed ? "warning" : "success");
     } catch (error) {
@@ -175,7 +180,7 @@
   $("#notification-filter").addEventListener("change", renderNotifications);
   $("#user-refresh").addEventListener("click", async event => {
     const button = event.currentTarget; button.disabled = true; button.textContent = "در حال دریافت…";
-    try { await Promise.all([loadSubmissions(),loadNotifications()]); showMessage("#page-message","اطلاعات فضای شخصی به‌روز شد.","success"); }
+    try { await Promise.all([loadSubmissions(),loadNotifications(),loadWallet()]); showMessage("#page-message","اطلاعات فضای شخصی به‌روز شد.","success"); }
     catch (error) { showMessage("#page-message",error.message,"error"); }
     finally { button.disabled = false; button.textContent = "↻ تازه‌سازی"; }
   });
@@ -208,7 +213,7 @@
   // Keep personal requests and notifications fresh without a manual reload.
   setInterval(() => {
     if (!document.hidden && currentUser) {
-      Promise.allSettled([loadSubmissions(), loadNotifications()]);
+      Promise.allSettled([loadSubmissions(), loadNotifications(), loadWallet()]);
     }
   }, 30000);
   document.addEventListener("visibilitychange", () => {
