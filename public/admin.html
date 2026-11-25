@@ -38,7 +38,7 @@
       <div class="toolbar-actions"><span class="live-clock" id="admin-clock">● آنلاین</span><button id="admin-refresh" class="quiet-button" type="button">↻ تازه‌سازی اطلاعات</button><button id="admin-export" class="quiet-button" type="button">↓ خروجی CSV</button></div>
     </div>
 
-    <section class="admin-launchpad" aria-label="دسترسی سریع"><a href="#submissions-panel"><span>▤</span><b>صف بررسی</b><small>درخواست‌های اعضا</small></a><a href="#users-panel"><span>◎</span><b>مدیریت کاربران</b><small>اعضا و دسترسی‌ها</small></a><a href="#publish-panel"><span>⌘</span><b>انتشار محتوا</b><small>کد، ZIP و فایل</small></a><a href="/owner-inbox.html"><span>✉</span><b>گفت‌وگوی خصوصی</b><small>پیام‌ها و سفارش‌ها</small></a><a href="/community.html"><span>✦</span><b>جامعه و N Coin</b><small>تجربه کاربران</small></a></section>\n\n    <section class="stats workspace-stats" aria-label="آمار کلی">
+    <section class="admin-launchpad" aria-label="دسترسی سریع"><a href="#submissions-panel"><span>▤</span><b>صف بررسی</b><small>درخواست‌های اعضا</small></a><a href="#users-panel"><span>◎</span><b>مدیریت کاربران</b><small>اعضا و دسترسی‌ها</small></a><a href="#publish-panel"><span>⌘</span><b>انتشار محتوا</b><small>کد، ZIP و فایل</small></a><a href="/owner-inbox.html"><span>✉</span><b>گفت‌وگوی خصوصی</b><small>پیام‌ها و سفارش‌ها</small></a><a href="/community.html"><span>✦</span><b>جامعه و N Coin</b><small>تجربه کاربران</small></a><a href="#telegram-panel"><span>✈</span><b>اتصال تلگرام</b><small>ربات FxiCode</small></a></section>\n\n    <section class="stats workspace-stats" aria-label="آمار کلی">
       <article class="stat" data-stat="users" hidden><span>اعضای ثبت‌نام‌شده</span><strong id="stat-users">—</strong><small>حساب‌های پلتفرم</small></article>
       <article class="stat" data-stat="bots" hidden><span>سورس‌های منتشرشده</span><strong id="stat-bots">—</strong><small>در کتابخانه عمومی</small></article>
       <article class="stat" data-stat="pending" hidden><span>در صف بررسی</span><strong id="stat-pending">—</strong><small>نیازمند تصمیم مدیر</small></article>
@@ -78,6 +78,7 @@
       <div id="manager-list" class="manager-list"><div class="skeleton-row"></div></div>
     </section>
 
+    <section class="panel workspace-panel" id="telegram-panel" hidden><div class="panel-heading"><div><span class="eyebrow">TELEGRAM INTEGRATION</span><h2>اتصال ربات @FxiCode_bot</h2><p class="panel-subtitle">پس از ثبت توکن و راز وب‌هوک در تنظیمات Cloudflare، اتصال ربات را فعال کن.</p></div><span class="panel-mark">✈</span></div><div class="telegram-admin-card"><div><b>آدرس وب‌هوک</b><code>https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook</code><small>این آدرس پس از ثبت، پیام‌های /start را دریافت می‌کند.</small></div><button id="telegram-register-webhook" class="button" type="button">ثبت وب‌هوک در تلگرام</button></div><div id="telegram-admin-message" class="inline-message" role="status"></div></section>
     <section class="panel workspace-panel" id="gifts-panel" hidden>
       <div class="panel-heading"><div><span class="eyebrow">GIFT CODE STUDIO</span><h2>ساخت و مدیریت کد هدیه</h2><p class="panel-subtitle">برای اعضا کد یک‌بار یا چندبارمصرف N Coin بساز.</p></div><span class="panel-mark">N</span></div>
       <form id="gift-form" class="manager-form">
@@ -236,6 +237,7 @@
       $("#account-role").textContent = isOwner ? "مالک اصلی · دسترسی کامل" : "مدیر محدود · دسترسی بر اساس مجوز";
       $(".identity-avatar").textContent = isOwner ? "O" : "M";
       showSection("manager-panel", isOwner);
+      showSection("telegram-panel", isOwner);
       showSection("no-permissions", !isOwner && permissions.length === 0);
       for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["publish-panel","bots"],["audit-panel","audit"],["gifts-panel","gifts"]]) showSection(id, permissions.includes(key));
       const overview = await api("/api/admin/overview");
@@ -262,6 +264,7 @@
     }
   }
 
+  $("#telegram-register-webhook").addEventListener("click",async()=>{const b=$("#telegram-register-webhook"),m=$("#telegram-admin-message");b.disabled=true;m.textContent="در حال بررسی توکن و ثبت وب‌هوک…";try{const d=await api("/api/admin/telegram/register-webhook",{method:"POST",body:"{}"});m.textContent="اتصال موفق است؛ ربات @"+d.bot_username+" به وب‌هوک متصل شد.";}catch(e){m.textContent=e.message;}finally{b.disabled=false;}});
   $("#manager-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
