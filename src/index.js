@@ -867,6 +867,7 @@ async function handleApi(request, env, url) {
         env.DB.prepare("SELECT COUNT(*) AS count FROM submissions").first()
       ]).then(([pending, submissions]) => { result.pending = pending.count; result.submissions = submissions.count; }));
       if (permissions.includes("audit")) jobs.push(env.DB.prepare("SELECT COUNT(*) AS count FROM audit_logs WHERE action='bot.download'").first().then(row => { result.downloads = row.count; }));
+      if (admin.user.role === "owner") jobs.push(env.DB.prepare("SELECT COALESCE(SUM(balance),0) AS total, COUNT(*) AS wallets FROM ncoin_wallets").first().then(row => { result.fcoin_balance = row.total; result.fcoin_wallets = row.wallets; }));
       await Promise.all(jobs);
       return json(result);
     }
