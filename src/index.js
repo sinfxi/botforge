@@ -1013,7 +1013,7 @@ export default {
       catch (error) { const requestId = id(); console.error("API request failed:", requestId, error); return json({ error: "ارتباط با سرویس کامل نشد. وضعیت اتصال را بررسی کن و دوباره تلاش کن.", request_id: requestId }, 500); }
     }
     const assetPath = url.pathname === "/" ? "/index.html" : url.pathname;
-    const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html", "/community.html", "/owner-inbox.html"]);
+    const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html", "/community.html", "/owner-inbox.html", "/assets/cyrus-hero.webp"]);
     if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
 
@@ -1037,7 +1037,9 @@ export default {
     // Cache successful reads per isolate and temporarily bypass KV after a slow/failing read.
     if (asset === null && env.FILES && Date.now() >= STATIC_KV_COOLDOWN_UNTIL) {
       try {
-        const read = env.FILES.get("static" + assetPath, "text");
+        // Binary assets must be read as ArrayBuffer; decoding WebP as UTF-8 corrupts the image.
+        const binaryAsset = assetPath.startsWith("/assets/");
+        const read = env.FILES.get("static" + assetPath, binaryAsset ? "arrayBuffer" : "text");
         let timeoutId;
         try {
           asset = await Promise.race([
@@ -1050,7 +1052,7 @@ export default {
         if (asset !== null) {
           source = "kv";
           STATIC_KV_COOLDOWN_UNTIL = 0;
-          STATIC_ASSET_CACHE.set(assetPath, { body: asset, source, expiresAt: Date.now() + 15000 });
+          STATIC_ASSET_CACHE.set(assetPath, { body: asset, source, expiresAt: Date.now() + (binaryAsset ? 3600000 : 15000) });
         } else {
           STATIC_KV_COOLDOWN_UNTIL = Date.now() + 10000;
         }
@@ -1082,8 +1084,14 @@ export default {
 
     if (asset !== null) {
       if (STATIC_ASSET_CACHE.size > 12) STATIC_ASSET_CACHE.clear();
-      const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8" : assetPath.endsWith(".css") ? "text/css; charset=utf-8" : "application/javascript; charset=utf-8";
-      const cacheControl = assetPath.endsWith(".html") ? "no-store" : "public, max-age=300, stale-while-revalidate=3600";
+      const contentType = assetPath.endsWith(".html") ? "text/html; charset=utf-8"
+        : assetPath.endsWith(".css") ? "text/css; charset=utf-8"
+        : assetPath.endsWith(".js") ? "application/javascript; charset=utf-8"
+        : assetPath.endsWith(".webp") ? "image/webp"
+        : "application/octet-stream";
+      const cacheControl = assetPath.endsWith(".html") ? "no-store"
+        : assetPath.startsWith("/assets/") ? "public, max-age=3600, stale-while-revalidate=86400"
+        : "public, max-age=300, stale-while-revalidate=3600";
       return new Response(request.method === "HEAD" ? null : asset, { headers: { "content-type": contentType, "cache-control": cacheControl, "x-fxi-static-source": source || "memory", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin", "permissions-policy": "camera=(), microphone=(), geolocation=()" } });
     }
     return new Response("Static asset temporarily unavailable", { status: 503, headers: { "cache-control": "no-store", "retry-after": "5", "content-type": "text/plain; charset=utf-8" } });
