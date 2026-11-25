@@ -867,48 +867,106 @@ async function handleApi(request, env, url) {
     const rewardId = safeText(body?.reward_id,80);
     const reward = await env.DB.prepare("SELECT id,title,price FROM ncoin_rewards WHERE id=? AND active=1").bind(rewardId).first();
     if (!reward) return json({error:"این جایزه در حال حاضر موجود نیست."},404);
-    const instant = {
-      "profile-badge": { key:"profile_badge", days:null },
-      "profile-frame": { key:"profile_frame", days:null },
-      "profile-theme": { key:"profile_theme", days:null },
-      "creator-spotlight": { key:"creator_spotlight", days:7 },
-      "creator-spotlight-plus": { key:"creator_spotlight_plus", days:14 },
-      "featured-project": { key:"featured_project", days:1, project:true },
-      "project-feature-24h": { key:"featured_project", days:1, project:true },
-      "project-feature-7d": { key:"featured_project", days:7, project:true },
-      "project-promotion-month": { key:"featured_project", days:30, project:true }
-    }[reward.id] || null;
-    let featuredProject = null;
-    if (instant?.project) {
-      featuredProject = await env.DB.prepare("SELECT id,title,featured_until FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
-      if (!featuredProject) return json({error:"برای فعال‌سازی این جایزه، ابتدا حداقل یک پروژه منتشرشده داشته باش."},400);
+
+    const instantPerks = {
+      "profile-badge": {key:"profile_badge",days:null},
+      "profile-frame": {key:"profile_frame",days:null},
+      "profile-theme": {key:"profile_theme",days:null},
+      "creator-spotlight": {key:"creator_spotlight",days:7},
+      "creator-spotlight-plus": {key:"creator_spotlight_plus",days:14},
+      "featured-project": {key:"featured_project",days:1,project:true},
+      "project-feature-24h": {key:"featured_project",days:1,project:true},
+      "project-feature-7d": {key:"featured_project",days:7,project:true},
+      "project-promotion-month": {key:"featured_project",days:30,project:true}
+    };
+    const perk=instantPerks[reward.id]||null;
+    let featuredProject=null;
+    if(perk?.project){
+      featuredProject=await env.DB.prepare("SELECT id,title,featured_until FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
+      if(!featuredProject)return json({error:"برای فعال‌سازی این جایزه، ابتدا حداقل یک پروژه منتشرشده داشته باش."},400);
     }
-    if (instant && !instant.days) {
-      const already = await env.DB.prepare("SELECT id FROM ncoin_entitlements WHERE user_id=? AND entitlement_key=? AND status='active' AND expires_at IS NULL LIMIT 1").bind(auth.user.id,instant.key).first();
-      if (already) return json({error:"این مزیت دائمی را قبلاً فعال کرده‌ای."},409);
+    if(perk&&!perk.days){
+      const already=await env.DB.prepare("SELECT id FROM ncoin_entitlements WHERE user_id=? AND entitlement_key=? AND status='active' AND expires_at IS NULL LIMIT 1").bind(auth.user.id,perk.key).first();
+      if(already)return json({error:"این مزیت دائمی را قبلاً فعال کرده‌ای."},409);
     }
+
+    // Every non-perk service now creates a real, immediately accessible deliverable.
+    // These are transparent, metadata-based starter deliverables—not claims of a source-code audit or human design.
+    const serviceSpecs={
+      "priority-review":["بسته آماده‌سازی بررسی فوری",["عنوان و هدف پروژه را در یک جمله روشن کن.","مراحل نصب و اجرای پروژه را قابل تکرار بنویس.","یک حساب آزمایشی و داده غیرحساس برای بررسی آماده کن.","خطاهای شناخته‌شده و محدودیت‌ها را شفاف فهرست کن."],"این بسته اولویت بررسی را در صف مدیران تضمین نمی‌کند؛ یک چک‌لیست آماده‌سازی فوری تحویل می‌دهد."],
+      "custom-profile-badge":["طرح نشان اختصاصی سازنده",["نام پیشنهادی نشان: "+auth.user.username+" · Creator","سبک پیشنهادی: مینیمال، خوانا و هماهنگ با هویت BotForge","رنگ پیشنهادی: سبز یشمی و طلایی ملایم","برای ثبت نشان تصویری نهایی، فایل گرافیکی لازم است."],"خروجی فعلی مشخصات طراحی و متن نشان است؛ تصویر نهایی در این نسخه به‌صورت خودکار رندر نمی‌شود."],
+      "code-review-basic":["گزارش بازبینی مقدماتی پروژه",["نام پروژه: {project}","ساختار پوشه‌ها و جداسازی منطق از رابط کاربری را بررسی کن.","نام‌گذاری توابع و مدیریت خطاها را یکدست کن.","README، نصب و روش اجرای محلی را کامل کن.","ورودی‌های کاربر را اعتبارسنجی و خطاها را قابل فهم نمایش بده."],"این گزارش از اطلاعات ثبت‌شده پروژه ساخته شده و به معنی خواندن یا اجرای سورس کد نیست."],
+      "code-review-deep":["برنامه بازبینی عمیق کد",["لایه‌بندی ماژول‌ها و وابستگی‌ها را مستند کن.","مسیرهای حساس احراز هویت و مجوزها را جداگانه بررسی کن.","حالت‌های خطا، ورودی‌های مرزی و رقابت درخواست‌ها را آزمایش کن.","تست واحد و تست یکپارچه برای مسیرهای اصلی اضافه کن.","مصرف حافظه، درخواست‌های شبکه و کوئری‌های دیتابیس را اندازه‌گیری کن.","برای هر اصلاح، تست بازگشتی تعریف کن."],"این یک برنامه بازبینی عمیق و قابل اجراست؛ بدون دریافت و تحلیل فایل‌های سورس، یافته قطعی امنیتی یا باگ اختصاصی اعلام نمی‌شود."],
+      "security-check":["چک‌لیست بررسی امنیت اولیه",["کلیدها و توکن‌ها فقط در Secretهای سمت سرور نگهداری شوند.","مجوز هر API در سمت سرور بررسی شود؛ مخفی‌کردن دکمه کافی نیست.","ورودی‌ها اعتبارسنجی و خروجی‌های HTML escape شوند.","کوکی نشست HttpOnly، Secure و SameSite مناسب داشته باشد.","محدودیت نرخ برای ورود، ارسال پیام و عملیات مالی اعمال شود.","برای تغییر موجودی و خرید از تراکنش اتمیک و محدودیت یکتا استفاده کن.","از دیتابیس و فایل‌های مهم نسخه پشتیبان بگیر."],"این چک‌لیست راهنمای اولیه است و جایگزین اسکن یا ممیزی تخصصی امنیتی نیست."],
+      "project-showcase":["متن آماده صفحه معرفی پروژه",["عنوان: {project}","معرفی کوتاه: {description}","دسته‌بندی: {category}","ارزش پیشنهادی: این پروژه با هدف ساده‌ترکردن یک فرایند مشخص و ارائه تجربه‌ای قابل استفاده ساخته شده است.","بخش‌های پیشنهادی صفحه: معرفی، امکانات، تصاویر، راهنمای نصب، نسخه‌ها، پرسش‌های متداول و راه ارتباطی.","دعوت به اقدام: مشاهده پروژه و بررسی راهنمای شروع."],"متن معرفی بر اساس اطلاعات موجود در BotForge ساخته شده؛ تصویر و صفحه گرافیکی مستقل در این تحویل وجود ندارد."],
+      "custom-cover":["بریف آماده طراحی کاور اختصاصی",["نام روی کاور: {project}","زیرعنوان: {category} · FXI BotForge","ترکیب‌بندی: عنوان خوانا، یک نماد مرکزی و فضای خالی کافی","پالت پیشنهادی: سبز تیره، کرم روشن و طلایی کم‌رنگ","خروجی پیشنهادی: تصویر افقی ۱۶:۹ و نسخه مربعی برای کارت پروژه."],"این خروجی بریف دقیق طراحی است، نه فایل تصویر نهایی."],
+      "verified-creator-review":["چک‌لیست آمادگی نشان سازنده تأییدشده",["پروفایل را با نام کاربری و توضیح حرفه‌ای کامل کن.","حداقل یک پروژه منتشرشده با توضیحات و راهنمای نصب داشته باش.","مالکیت یا مجوز انتشار همه فایل‌ها را روشن کن.","لینک‌های پروژه و راه‌های ارتباطی معتبر باشند.","سوابق به‌روزرسانی و پشتیبانی پروژه را ثبت کن."],"دریافت نشان تضمین نمی‌شود؛ این گزارش فقط آمادگی پروفایل را ارزیابی می‌کند."],
+      "priority-support-week":["بسته آماده ارسال درخواست پشتیبانی",["موضوع درخواست را در یک جمله مشخص کن.","شناسه حساب: "+auth.user.public_id,"پروژه مرتبط: {project}","مراحل بازتولید مشکل و پیام خطای کامل را اضافه کن.","زمان رخداد، مرورگر و دستگاه را ذکر کن.","توکن، رمز عبور و اطلاعات خصوصی را ارسال نکن."],"این بسته متن و اطلاعات لازم برای پشتیبانی را آماده می‌کند؛ صف اولویت‌دار پشتیبانی در این نسخه به‌صورت خودکار زمان پاسخ را تضمین نمی‌کند."],
+      "custom-bot-blueprint":["طرح اولیه ربات اختصاصی",["هدف ربات: {description}","ماژول‌ها: مدیریت کاربران، تنظیمات، ثبت رویدادها، مدیریت خطا و گزارش‌گیری.","امنیت: احراز هویت، کنترل دسترسی، rate limit و نگهداری امن توکن‌ها.","ذخیره‌سازی: جداول کاربران، تنظیمات، رویدادها و وظایف زمان‌بندی‌شده.","نسخه اول: مسیر اصلی کاربر و حداقل قابلیت‌های ضروری.","نسخه دوم: گزارش‌ها، اتوماسیون و امکانات مدیریتی."],"این سند طرح اولیه فنی است و کد اجرایی ربات را ایجاد یا مستقر نمی‌کند."],
+      "architecture-consult":["گزارش پیشنهادی معماری پروژه",["رابط کاربری فقط مسئول نمایش و اعتبارسنجی اولیه باشد.","منطق کسب‌وکار و کنترل مجوزها در API سمت سرور اجرا شود.","داده‌های ساختاریافته در دیتابیس و فایل‌ها در فضای ذخیره‌سازی جدا نگهداری شوند.","برای عملیات حساس، تراکنش و idempotency در نظر بگیر.","لاگ‌ها باید قابل جست‌وجو باشند و اطلاعات محرمانه را ثبت نکنند.","محیط توسعه و انتشار را از هم جدا نگه دار."],"این پیشنهاد معماری عمومی بر اساس توضیحات ثبت‌شده است، نه جلسه زنده با مهندس."],
+      "creator-premium-pack":["بسته محتوایی ویژه سازنده",["معرفی کوتاه: "+auth.user.username+"؛ سازنده فعال در جامعه FXI BotForge.","عنوان پیشنهادی: سازنده و توسعه‌دهنده پروژه‌های کاربردی","متن معرفی پروژه: {project}","چک‌لیست پروفایل: تصویر، بیوگرافی، لینک پروژه، راه ارتباطی و نمونه کار.","چک‌لیست انتشار: README، نسخه‌بندی، اسکرین‌شات و راهنمای نصب."],"این بسته محتوای متنی و چک‌لیست آماده می‌کند؛ مزایای تصویری یا تبلیغاتی مستقل در آن فعال نمی‌شود."],
+      "legendary-creator-pack":["بسته جامع حرفه‌ای سازنده",["بیوگرافی پیشنهادی: "+auth.user.username+" · سازنده و توسعه‌دهنده پروژه‌های دیجیتال.","متن معرفی منتخب: {project}","نقشه راه: تکمیل مستندات، تست خودکار، بهبود امنیت، پایش و انتشار نسخه‌بندی‌شده.","برنامه معرفی: کاور ۱۶:۹، توضیح کوتاه، امکانات کلیدی و لینک شروع سریع.","چک‌لیست کیفیت: تست، مدیریت خطا، دسترس‌پذیری، امنیت و پشتیبان‌گیری.","گام بعدی: انتخاب یک پروژه اصلی و تکمیل موارد اولویت‌دار."],"این بسته سند و محتوای آماده تحویل می‌دهد؛ طراحی گرافیکی، ممیزی انسانی یا تبلیغات تضمین‌شده جزو خروجی خودکار نیست."],
+      "project-readme-polish":["پیش‌نویس README حرفه‌ای",["# {project}","{description}","## امکانات\n- معرفی و توضیح کاربرد پروژه\n- راهنمای نصب و اجرا\n- تنظیمات و متغیرهای محیطی\n- نمونه استفاده و خطاهای رایج\n- مجوز و راه ارتباطی","## شروع سریع\n۱. مخزن را دریافت کن.\n۲. پیش‌نیازهای پروژه را نصب کن.\n۳. فایل تنظیمات نمونه را بساز.\n۴. برنامه را اجرا و مسیر اصلی را آزمایش کن.","## وضعیت\nاطلاعات نسخه، پیش‌نیازها و دستورهای واقعی اجرا را قبل از انتشار تکمیل کن."],"این پیش‌نویس قابل کپی است؛ دستورهای دقیق نصب باید با فناوری‌های واقعی پروژه تطبیق داده شوند."],
+      "project-thumbnail":["بریف تصویر بندانگشتی",["عنوان: {project}","متن کوتاه: {category}","فرمت اصلی: ۱۶:۹ با نسخه مربعی","عنوان حداکثر دو خط و در اندازه موبایل خوانا باشد.","از یک نماد اصلی و حداکثر سه رنگ استفاده کن.","لوگو و متن در محدوده امن تصویر قرار بگیرند."],"این تحویل بریف طراحی است، نه فایل PNG یا WebP."],
+      "portfolio-review":["گزارش بازبینی نمونه‌کار",["برای هر پروژه یک مسئله و نتیجه قابل فهم بنویس.","تصویر واقعی از محصول اضافه کن؛ تصویر تزئینی جای محصول را نگیرد.","نقش خودت و فناوری‌های استفاده‌شده را دقیق بیان کن.","لینک دمو و مخزن را آزمایش کن.","پروژه‌های قدیمی را آرشیو و بهترین نمونه‌ها را برجسته کن.","برای هر پروژه یک فراخوان روشن مثل مشاهده دمو قرار بده."],"این ارزیابی بر اساس اطلاعات حساب و پروژه‌های ثبت‌شده است؛ صفحات خارجی بررسی نشده‌اند."],
+      "bot-command-audit":["گزارش طراحی و ممیزی فرمان‌های ربات",["فرمان‌ها را بر اساس نقش کاربر دسته‌بندی کن.","برای هر فرمان ورودی، خروجی و سطح دسترسی مشخص کن.","فرمان‌های خطرناک را با تأیید دومرحله‌ای محافظت کن.","برای ورودی نامعتبر و خطای سرویس پیام روشن داشته باش.","از rate limit و ثبت audit log استفاده کن.","فرمان‌های قدیمی و تکراری را حذف یا مستند کن."],"بدون سورس یا فهرست فرمان‌های واقعی، این گزارش چک‌لیست ممیزی است و ادعای کشف باگ اختصاصی ندارد."],
+      "api-integration-plan":["نقشه اجرایی اتصال API",["۱. قرارداد endpointها و ساختار JSON را مشخص کن.","۲. احراز هویت و مجوز هر مسیر را تعریف کن.","۳. کدهای HTTP و قالب خطاها را یکسان کن.","۴. timeout، retry محدود و idempotency را پیاده کن.","۵. ورودی‌ها را سمت سرور اعتبارسنجی کن.","۶. لاگ درخواست را بدون توکن و داده حساس ثبت کن.","۷. برای مسیرهای اصلی تست یکپارچه بنویس."],"نمونه ساختار پاسخ: { ok: true, data: {}, error: null }"],
+      "performance-audit":["برنامه بهینه‌سازی عملکرد",["زمان پاسخ API را در حالت سرد و گرم اندازه‌گیری کن.","درخواست‌های تکراری رابط کاربری را ادغام کن.","برای فهرست‌ها صفحه‌بندی و محدودیت تعداد نتایج قرار بده.","کوئری‌های پرتکرار را با EXPLAIN و ایندکس بررسی کن.","فایل‌های تصویری را فشرده و lazy-load کن.","برای منابع عمومی cache-control مناسب تعریف کن.","قبل و بعد از هر تغییر، معیار قابل اندازه‌گیری ثبت کن."],"این برنامه بر اساس اطلاعات پروژه تولید شده؛ عدد سرعت یا گلوگاه واقعی بدون اندازه‌گیری اعلام نمی‌شود."],
+      "database-review":["گزارش بازبینی طراحی دیتابیس",["برای هر جدول کلید اصلی و نوع داده دقیق تعریف کن.","روابط خارجی و رفتار حذف آبشاری را مستند کن.","روی ستون‌های جست‌وجو و join ایندکس مناسب بساز.","برای موجودی و سفارش از تراکنش اتمیک استفاده کن.","قیود UNIQUE و CHECK را برای داده‌های حساس فعال کن.","مهاجرت‌ها را نسخه‌بندی و قبل از اجرا پشتیبان بگیر.","سیاست نگهداری و حذف داده را مشخص کن."],"این گزارش راهنمای بازبینی است؛ ساختار واقعی دیتابیس پروژه به‌صورت خودکار اسکن نشده است."],
+      "security-hardening-plan":["برنامه اجرایی سخت‌سازی امنیت",["Secrets را از کد و مخزن خارج کن.","مجوزها را در هر endpoint سمت سرور کنترل کن.","کوکی نشست را HttpOnly، Secure و SameSite تنظیم کن.","برای عملیات حساس CSRF و کنترل Origin را بررسی کن.","ورودی و خروجی را اعتبارسنجی و escape کن.","Rate limit، audit log و هشدار ورود ناموفق داشته باش.","دسترسی دیتابیس را حداقلی و پشتیبان‌گیری را رمزگذاری کن."],"این برنامه راهنمای اجرایی است و ادعای انجام اسکن امنیتی ندارد."],
+      "custom-bot-roadmap":["نقشه راه ساخت ربات اختصاصی",["مرحله ۱ · تعریف مخاطب، هدف و سناریوی اصلی.","مرحله ۲ · طراحی فرمان‌ها و مسیرهای مکالمه.","مرحله ۳ · ساخت دیتابیس، تنظیمات و کنترل دسترسی.","مرحله ۴ · پیاده‌سازی قابلیت اصلی و مدیریت خطا.","مرحله ۵ · تست، rate limit و ثبت رویدادها.","مرحله ۶ · استقرار، پایش و پشتیبان‌گیری."],"این نقشه راه آماده اجراست؛ کد ربات در این خرید ساخته یا منتشر نمی‌شود."],
+      "creator-interview":["متن معرفی و گفت‌وگوی سازنده",["معرفی: "+auth.user.username+"، عضو جامعه FXI BotForge.","حوزه فعالیت: توسعه و ساخت پروژه‌های دیجیتال.","پروژه منتخب: {project}","چه مسئله‌ای را حل می‌کند؟ {description}","گام بعدی سازنده: تکمیل مستندات، انتشار نسخه پایدار و دریافت بازخورد."],"این متن معرفی اولیه است؛ مصاحبه واقعی یا انتشار عمومی بدون تأیید کاربر انجام نمی‌شود."],
+      "featured-creator-month":["بسته آماده معرفی سازنده · ۳۰ روز",["عنوان: سازنده منتخب جامعه BotForge","نام نمایشی: "+auth.user.username,"شناسه عمومی: "+auth.user.public_id,"پروژه منتخب: {project}","متن کوتاه معرفی: سازنده‌ای فعال با تمرکز بر ارائه پروژه‌های کاربردی و مستند.","برای انتشار عمومی، متن و پروژه منتخب را بازبینی و تأیید کن."],"این بسته محتوای معرفی را همان لحظه تحویل می‌دهد؛ نمایش عمومی خودکار فعال نمی‌شود."],
+      "ultimate-launch-kit":["بسته کامل آماده‌سازی انتشار",["عنوان و معرفی پروژه: {project}","README: پیش‌نویس معرفی، نصب، تنظیمات و راهنمای استفاده.","کنترل کیفیت: تست مسیر اصلی، مدیریت خطا و بررسی ورودی‌ها.","انتشار: نسخه‌بندی، یادداشت تغییرات و تصویر ۱۶:۹.","امنیت: مدیریت Secrets، مجوزها، rate limit و پشتیبان‌گیری.","معرفی: متن کوتاه برای صفحه پروژه و شبکه‌های اجتماعی.","پس از انتشار: پایش خطاها، دریافت بازخورد و برنامه اصلاح."],"این بسته سند و چک‌لیست قابل استفاده تولید می‌کند؛ انتشار واقعی یا بررسی سورس انجام نمی‌دهد."]
+    };
+    const spec=serviceSpecs[reward.id]||null;
+    if(!perk&&!spec)return json({error:"برای این جایزه هنوز خروجی خودکار تعریف نشده است."},409);
+
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_deliveries (purchase_id TEXT PRIMARY KEY REFERENCES ncoin_purchases(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, reward_id TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    let project=null;
+    if(spec)project=await env.DB.prepare("SELECT title,description,category FROM bots WHERE uploader_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(auth.user.id).first();
+    const projectName=safeText(project?.title||"پروژه جدید",100);
+    const projectDescription=safeText(project?.description||"توضیحات پروژه هنوز در حساب ثبت نشده است.",500);
+    const category=safeText(project?.category||"عمومی",50);
+    const fill=value=>String(value).replaceAll("{project}",projectName).replaceAll("{description}",projectDescription).replaceAll("{category}",category);
+    const deliveryContent=spec?[
+      "# "+spec[0],
+      "",
+      "تحویل فوری برای "+auth.user.username+" · شناسه "+auth.user.public_id,
+      "پروژه مرتبط: "+projectName+" · دسته‌بندی: "+category,
+      "",
+      ...spec[1].map((line,index)=> (index+1)+". "+fill(line)),
+      "",
+      "## توضیح دامنه تحویل",
+      spec[2],
+      "",
+      "## وضعیت",
+      "این خروجی در زمان خرید به‌صورت خودکار تولید و در حساب شما ذخیره شده است."
+    ].join("\n"):null;
+
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
-    const purchaseId=id(), purchasedAt=now();
-    const featureBase = featuredProject?.featured_until && featuredProject.featured_until > purchasedAt ? Date.parse(featuredProject.featured_until) : Date.now();
-    const expiresAt = instant?.days ? new Date((Number.isFinite(featureBase)?featureBase:Date.now())+instant.days*86400000).toISOString() : null;
-    const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,auth.user.id,reward.price).run();
-    const changed = Number(update?.meta?.changes ?? update?.changes ?? 0);
-    if (!changed) return json({error:"موجودی F COIN برای خرید این جایزه کافی نیست."},400);
-    try {
-      const statements = [
-        env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) VALUES(?,?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,reward.price,instant?"delivered":"pending"),
-        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,-reward.price,"purchase","خرید: "+reward.title)
+    const purchaseId=id(),purchasedAt=now();
+    const featureBase=featuredProject?.featured_until&&featuredProject.featured_until>purchasedAt?Date.parse(featuredProject.featured_until):Date.now();
+    const expiresAt=perk?.days?new Date((Number.isFinite(featureBase)?featureBase:Date.now())+perk.days*86400000).toISOString():null;
+    const debit=await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,auth.user.id,reward.price).run();
+    const changed=Number(debit?.meta?.changes??debit?.changes??0);
+    if(!changed)return json({error:"موجودی F COIN برای خرید این جایزه کافی نیست."},400);
+    try{
+      const statements=[
+        env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) VALUES(?,?,?,?, 'delivered')").bind(purchaseId,auth.user.id,reward.id,reward.price),
+        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,-reward.price,"purchase","خرید و تحویل فوری: "+reward.title)
       ];
-      if (instant) statements.push(env.DB.prepare("INSERT INTO ncoin_entitlements(id,user_id,reward_id,entitlement_key,activated_at,expires_at,status,metadata_json) VALUES(?,?,?,?,?,?, 'active', ?)").bind(id(),auth.user.id,reward.id,instant.key,purchasedAt,expiresAt,featuredProject?JSON.stringify({project_id:featuredProject.id,project_title:featuredProject.title}):null));
-      if (featuredProject) statements.push(env.DB.prepare("UPDATE bots SET featured_until=? WHERE id=? AND uploader_id=?").bind(expiresAt,featuredProject.id,auth.user.id));
+      if(perk)statements.push(env.DB.prepare("INSERT INTO ncoin_entitlements(id,user_id,reward_id,entitlement_key,activated_at,expires_at,status,metadata_json) VALUES(?,?,?,?,?,?, 'active', ?)").bind(id(),auth.user.id,reward.id,perk.key,purchasedAt,expiresAt,featuredProject?JSON.stringify({project_id:featuredProject.id,project_title:featuredProject.title}):null));
+      if(featuredProject)statements.push(env.DB.prepare("UPDATE bots SET featured_until=? WHERE id=? AND uploader_id=?").bind(expiresAt,featuredProject.id,auth.user.id));
+      if(spec)statements.push(env.DB.prepare("INSERT INTO ncoin_deliveries(purchase_id,user_id,reward_id,title,content) VALUES(?,?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,spec[0],deliveryContent));
       await env.DB.batch(statements);
-    } catch (error) {
+    }catch(error){
       await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(reward.price,now(),auth.user.id).run();
       throw error;
     }
-    await audit(env,auth.user.id,"ncoin.reward.purchase","reward",reward.id,{purchase_id:purchaseId,price:reward.price,instant:!!instant,entitlement:instant?.key||null});
-    if (instant) await notify(env,auth.user.id,"جایزه شما فعال شد ✨","«"+reward.title+"» بلافاصله فعال شد.","success");
-    return json({ok:true,purchase_id:purchaseId,activated:!!instant,message:instant?"خرید موفق بود؛ جایزه همین حالا فعال شد.":"سفارش ثبت شد و برای آماده‌سازی در صف قرار گرفت."},201);
+    await audit(env,auth.user.id,"ncoin.reward.purchase","reward",reward.id,{purchase_id:purchaseId,price:reward.price,instant:true,entitlement:perk?.key||null,delivery:!!spec});
+    await notify(env,auth.user.id,"خرید با موفقیت تحویل شد 🎁","«"+reward.title+"» همین حالا در بخش سوابق خرید قابل مشاهده است.","success");
+    return json({ok:true,purchase_id:purchaseId,activated:true,delivered:true,delivery_title:spec?.[0]||null,message:spec?"خرید موفق بود؛ خروجی خدمت همین حالا در سوابق خریدت آماده است.":"خرید موفق بود؛ مزیت همین حالا فعال شد."},201);
   }
 
   if (path === "/api/community/owner-chat" && method === "GET") {
