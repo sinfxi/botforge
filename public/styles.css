@@ -367,3 +367,39 @@ button:not(:disabled):active,.button:active,.quiet-button:active{transform:scale
 
 .telegram-admin-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px;border:1px solid #e1e9df;border-radius:17px;background:#f8fbf6}.telegram-admin-card b,.telegram-admin-card small{display:block}.telegram-admin-card code{display:block;margin:9px 0;direction:ltr;text-align:left;overflow-wrap:anywhere;color:#287e75;font-size:11px}.telegram-admin-card small{color:#879386;font-size:10px}.telegram-admin-card .button{white-space:nowrap}
 @media(max-width:650px){.telegram-admin-card{align-items:stretch;flex-direction:column}.telegram-admin-card .button{width:100%}}
+
+/* FXI BotForge — Cyrus identity, dimensional UI and public announcements */
+.brand-mark{overflow:hidden;position:relative;isolation:isolate;border-radius:14px;transform:translateZ(12px);box-shadow:0 10px 25px rgba(36,54,44,.22)}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:cover;object-position:42% 34%;transform:scale(1.35)}
+.hero-visual{perspective:1100px}
+.hero-cyrus-art{position:relative;z-index:1;width:min(100%,500px);max-height:470px;object-fit:cover;object-position:43% 44%;border-radius:38px 38px 110px 38px;filter:saturate(.92) contrast(1.04);box-shadow:22px 28px 70px rgba(0,0,0,.38);transform:rotateY(-8deg) rotateX(3deg) translateZ(35px);animation:cyrus-drift 8s ease-in-out infinite}
+.hero-visual:after{content:"";position:absolute;z-index:0;inset:9% 6% 4% 8%;border:1px solid rgba(226,197,128,.35);border-radius:42px 42px 115px 42px;transform:rotateY(-8deg) translateZ(-8px);pointer-events:none}
+.hero-orbit-label{position:absolute;bottom:0;right:50%;transform:translateX(50%);font-size:9px;letter-spacing:3px;color:#d7c18d;z-index:2;white-space:nowrap}
+.workspace-hero{background-image:linear-gradient(90deg,rgba(24,49,37,.97) 0%,rgba(24,49,37,.88) 50%,rgba(24,49,37,.34) 100%),url('/assets/cyrus-hero.webp');background-size:cover;background-position:center 38%;box-shadow:0 28px 70px rgba(23,52,37,.18),inset 0 1px rgba(255,255,255,.13)}
+body{perspective:1600px}
+.panel,.stat,.bot-card,.auth-card,.setup .card,.community-wallet,.community-lucky,.ncoin-showcase,.creator-shortcuts>a,.admin-launchpad>a,.telegram-connect-panel,.workspace-toolbar{transform-style:preserve-3d;transition:transform .32s cubic-bezier(.2,.8,.2,1),box-shadow .32s,border-color .32s}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){.panel:hover,.stat:hover,.bot-card:hover,.auth-card:hover,.setup .card:hover,.community-wallet:hover,.community-lucky:hover,.creator-shortcuts>a:hover,.admin-launchpad>a:hover,.telegram-connect-panel:hover{transform:translateY(-4px) rotateX(1.1deg) rotateY(-.7deg);box-shadow:0 25px 55px rgba(35,58,43,.13)}.button:hover,.quiet-button:hover,.actions button:hover{transform:translateY(-2px) translateZ(8px)}}
+.workspace,.section,.dash,.admin{transform-style:preserve-3d}
+.announcement-slot{width:min(1120px,calc(100% - 40px));margin:34px auto 48px;position:relative;perspective:1200px}
+.announcement-feed{display:grid;grid-template-columns:1fr;gap:13px}
+.announcement-float{--announcement-image:url('/assets/cyrus-hero.webp');position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;min-height:150px;padding:24px 58px 24px 28px;border:1px solid rgba(255,255,255,.8);border-radius:26px;background:linear-gradient(110deg,rgba(255,228,239,.96),rgba(255,196,220,.89) 54%,rgba(242,165,198,.76)),var(--announcement-image);background-size:cover;background-position:center 36%;box-shadow:0 18px 46px rgba(194,91,139,.18),inset 0 1px 0 rgba(255,255,255,.8);transform:rotateX(1.2deg) translateZ(18px);transition:transform .3s,box-shadow .3s}
+.announcement-float:before{content:"";position:absolute;z-index:-1;inset:0;background:radial-gradient(circle at 12% 0%,rgba(255,255,255,.65),transparent 35%),linear-gradient(90deg,rgba(255,235,243,.2),rgba(255,211,228,.78));backdrop-filter:blur(2px)}
+.announcement-float:after{content:"";position:absolute;z-index:-1;width:180px;height:180px;left:4%;bottom:-115px;border:1px solid rgba(190,83,133,.2);border-radius:50%;box-shadow:0 0 0 15px rgba(255,255,255,.11),0 0 0 34px rgba(190,83,133,.06)}
+.announcement-float:hover{transform:translateY(-3px) rotateX(0) translateZ(25px);box-shadow:0 24px 55px rgba(194,91,139,.22)}
+.announcement-content{min-width:0;position:relative;z-index:1;max-width:850px}
+.announcement-kicker{display:inline-flex;padding:5px 11px;border:1px solid rgba(173,74,119,.17);border-radius:30px;background:rgba(255,255,255,.55);color:#a34e78;font-size:9px;font-weight:900}
+.announcement-content h3{margin:8px 0 4px;color:#783c5b;font-size:clamp(16px,2.2vw,21px);line-height:1.5}
+.announcement-content p{margin:0;color:#79546a;font-size:11px;line-height:2;white-space:pre-wrap}
+.announcement-dismiss{position:absolute;left:15px;top:15px;z-index:2;width:30px;height:30px;border:1px solid rgba(173,74,119,.16);border-radius:50%;background:rgba(255,255,255,.55);color:#8d4d6c;font-size:20px;cursor:pointer}
+.announcement-gift-code{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.announcement-gift-code code{direction:ltr;display:inline-flex;padding:7px 14px;border:1px dashed rgba(150,60,104,.4);border-radius:11px;background:rgba(255,255,255,.72);color:#743453;font-size:15px;font-weight:900;letter-spacing:2px}
+.announcement-gift-code button{padding:8px 14px;border:0;border-radius:11px;background:linear-gradient(135deg,#a94d7a,#82365e);color:white;font:inherit;font-size:10px;font-weight:850;cursor:pointer;box-shadow:0 8px 17px rgba(139,49,94,.2)}
+.announcement-created{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:16px 0;padding:16px 18px;border:1px solid #f0c2d7;border-radius:17px;background:linear-gradient(110deg,#fff0f6,#fce0eb);color:#793d5b}
+.announcement-created b,.announcement-created small,.announcement-created code{display:block}
+.announcement-created code{margin:6px 0;direction:ltr;font-size:18px;letter-spacing:2px}
+.announcement-created small{font-size:10px;color:#99637d}
+.announcement-code-preview{display:inline-block;margin-top:6px;padding:4px 8px;border-radius:7px;background:#fff0f6;color:#874363;direction:ltr}
+.announcement-row-icon{background:linear-gradient(145deg,#ffe0ed,#f2b7d0)!important;color:#9d4b73!important}
+@keyframes cyrus-drift{0%,100%{transform:rotateY(-8deg) rotateX(3deg) translateY(0) translateZ(35px)}50%{transform:rotateY(-5deg) rotateX(1deg) translateY(-7px) translateZ(42px)}}
+@media(max-width:760px){.hero-cyrus-art{width:min(88%,360px);max-height:340px;border-radius:26px 26px 65px 26px}.announcement-slot{width:calc(100% - 28px);margin:24px auto 34px}.announcement-float{padding:20px 48px 20px 18px;border-radius:20px;min-height:130px}.announcement-content h3{font-size:16px}.announcement-created{align-items:flex-start;flex-direction:column}.announcement-created .button{width:100%}}
+@media(prefers-reduced-motion:reduce){.hero-cyrus-art{animation:none}.panel,.stat,.bot-card,.auth-card,.setup .card,.community-wallet,.community-lucky,.creator-shortcuts>a,.admin-launchpad>a{transition:none!important}}
