@@ -66,7 +66,7 @@ async function requireAdmin(request, env) {
   if (auth.response) return auth;
   return ["admin", "owner"].includes(auth.user.role) ? auth : { response: json({ error: "اجازه دسترسی ندارید." }, 403) };
 }
-function safePermissions(value) { try { const p=JSON.parse(value || "[]"); return Array.isArray(p) ? [...new Set(p.filter(x => ["submissions","users","bots","audit"].includes(x)))] : []; } catch { return []; } }
+function safePermissions(value) { try { const p=JSON.parse(value || "[]"); return Array.isArray(p) ? [...new Set(p.filter(x => ["submissions","users","bots","audit","gifts"].includes(x)))] : []; } catch { return []; } }
 function sameOrigin(request) {
   const requestUrl = new URL(request.url);
   const origin = request.headers.get("origin");
@@ -223,6 +223,28 @@ async function handleApi(request, env, url) {
     if (!user) return json({error:"کاربری با این شناسه پیدا نشد."},404);
     const projects = await env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first();
     return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0)}});
+  }
+
+  if (path === "/api/community/gift/redeem" && method === "POST") {
+    if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+    const auth=await requireUser(request,env);if(auth.response)return auth.response;
+    const body=await request.json().catch(()=>null);
+    const code=safeText(body?.code,32).toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(code.length!==12)return json({error:"کد هدیه معتبر نیست."},400);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_codes (id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, code_hint TEXT NOT NULL, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, used_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_redemptions (id TEXT PRIMARY KEY, gift_id TEXT NOT NULL, user_id TEXT NOT NULL, amount INTEGER NOT NULL, redeemed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(gift_id,user_id))").run();
+    const gift=await env.DB.prepare("SELECT * FROM gift_codes WHERE code_hash=? AND active=1").bind(await sha256(code.match(/.{1,4}/g).join("-"))).first();
+    if(!gift || gift.used_count>=gift.max_uses || (gift.expires_at && gift.expires_at<=now()))return json({error:"کد هدیه نامعتبر، منقضی یا تمام‌شده است."},404);
+    try {
+      await env.DB.prepare("INSERT INTO gift_redemptions(id,gift_id,user_id,amount) VALUES(?,?,?,?)").bind(id(),gift.id,auth.user.id,gift.amount).run();
+    } catch { return json({error:"این کد را قبلاً در حساب خودت استفاده کرده‌ای."},409); }
+    const used=await env.DB.prepare("UPDATE gift_codes SET used_count=used_count+1 WHERE id=? AND active=1 AND used_count<max_uses AND (expires_at IS NULL OR expires_at>?)").bind(gift.id,now()).run();
+    if(Number(used?.meta?.changes??used?.changes??0)!==1){await env.DB.prepare("DELETE FROM gift_redemptions WHERE gift_id=? AND user_id=?").bind(gift.id,auth.user.id).run();return json({error:"ظرفیت این کد به پایان رسیده است."},409);}
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
+    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(gift.amount,now(),auth.user.id).run();
+    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,gift.amount,"gift","دریافت کد هدیه").run();
+    await audit(env,auth.user.id,"gift.redeem","gift",gift.id,{amount:gift.amount});
+    return json({ok:true,amount:gift.amount,message:"کد هدیه با موفقیت ثبت شد."});
   }
 
   if (path === "/api/community/lucky/claim" && method === "POST") {
@@ -399,7 +421,7 @@ async function handleApi(request, env, url) {
         const body = await request.json().catch(() => null);
         const username = safeText(body?.username, 24).toLowerCase();
         const password = typeof body?.password === "string" ? body.password : "";
-        const allowed = ["submissions","users","bots","audit"];
+        const allowed = ["submissions","users","bots","audit","gifts"];
         const permissions = Array.isArray(body?.permissions) ? [...new Set(body.permissions.filter(p => allowed.includes(p)))] : [];
         if (!/^[a-z0-9_]{3,24}$/.test(username) || password.length < 12 || password.length > 200 || !permissions.length) return json({ error: "نام کاربری معتبر، رمز حداقل ۱۲ کاراکتری و حداقل یک دسترسی لازم است." }, 400);
         const salt = id(), managerId = id();
@@ -434,6 +456,32 @@ async function handleApi(request, env, url) {
         await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(target.id).run();
         await audit(env,admin.user.id,"manager.remove","user",target.id,{username:target.username});
         return json({ok:true});
+      }
+      return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
+    }
+
+    if (path.startsWith("/api/admin/gifts")) {
+      if (admin.user.role !== "owner" && !safePermissions(admin.user.permissions_json).includes("gifts")) return json({error:"دسترسی ساخت کد هدیه برای این حساب فعال نیست."},403);
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_codes (id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, code_hint TEXT NOT NULL, amount INTEGER NOT NULL, max_uses INTEGER NOT NULL, used_count INTEGER NOT NULL DEFAULT 0, expires_at TEXT, active INTEGER NOT NULL DEFAULT 1, created_by TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS gift_redemptions (id TEXT PRIMARY KEY, gift_id TEXT NOT NULL, user_id TEXT NOT NULL, amount INTEGER NOT NULL, redeemed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(gift_id,user_id))").run();
+      if (path === "/api/admin/gifts" && method === "GET") {
+        const {results}=await env.DB.prepare("SELECT id,code_hint,amount,max_uses,used_count,expires_at,active,created_at FROM gift_codes ORDER BY created_at DESC LIMIT 100").all();
+        return json({items:results||[]});
+      }
+      if (path === "/api/admin/gifts" && method === "POST") {
+        if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+        const body=await request.json().catch(()=>null);
+        const amount=Math.floor(Number(body?.amount)), maxUses=Math.floor(Number(body?.max_uses));
+        const expiry=body?.expires_at ? new Date(body.expires_at).toISOString() : null;
+        if(!Number.isInteger(amount)||amount<1||amount>1000000||!Number.isInteger(maxUses)||maxUses<1||maxUses>10000|| (body?.expires_at && (!expiry || expiry<=now())))return json({error:"مقدار سکه، تعداد استفاده یا تاریخ انقضا معتبر نیست."},400);
+        const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        const bytes=new Uint8Array(12);crypto.getRandomValues(bytes);
+        const code=Array.from(bytes,b=>alphabet[b%alphabet.length]).join("").match(/.{1,4}/g).join("-");
+        const codeHash=await sha256(code.toUpperCase());
+        const giftId=id();
+        await env.DB.prepare("INSERT INTO gift_codes(id,code_hash,code_hint,amount,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?)").bind(giftId,codeHash,code.slice(-4),amount,maxUses,expiry,admin.user.id).run();
+        await audit(env,admin.user.id,"gift.create","gift",giftId,{amount,max_uses:maxUses,expires_at:expiry});
+        return json({ok:true,code,amount,max_uses:maxUses,expires_at:expiry},201);
       }
       return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
     }
@@ -486,14 +534,14 @@ async function handleApi(request, env, url) {
       return json({ok:true,status});
     }
 
-    const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : null;
+    const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : path.includes("/gifts") ? "gifts" : null;
     if (admin.user.role !== "owner" && capability) {
       const permissions = safePermissions(admin.user.permissions_json);
       if (!permissions.includes(capability)) return json({error:"این دسترسی برای حساب مدیر فعال نیست."},403);
     }
     if (path === "/api/admin/overview" && method === "GET") {
       const permissions = admin.user.role === "owner"
-        ? ["submissions", "users", "bots", "audit"]
+        ? ["submissions", "users", "bots", "audit", "gifts"]
         : safePermissions(admin.user.permissions_json);
       const result = {};
       const jobs = [];
