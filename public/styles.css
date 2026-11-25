@@ -506,3 +506,20 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
 .reward-catalog-tools{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:10px;margin:0 0 14px}.reward-catalog-tools input,.reward-catalog-tools select{width:100%;min-width:0;min-height:46px;padding:10px 13px;border:1px solid #e5eae1;border-radius:14px;background:#fffefa;color:var(--ink);font:inherit;font-size:11px;outline:none}.reward-catalog-tools input:focus,.reward-catalog-tools select:focus{border-color:#91ad91;box-shadow:0 0 0 4px #91ad9120}.reward-item[hidden]{display:none!important}@media(max-width:700px){.reward-catalog-tools{grid-template-columns:1fr}}
 
 .purchase-row{align-items:flex-start}.purchase-row>div{width:100%;min-width:0}.purchase-delivery{margin-top:10px;padding:12px;border:1px solid #e5eadf;border-radius:14px;background:#fbfcf8}.purchase-delivery summary{cursor:pointer;font-size:11px;font-weight:800;color:#45694c}.purchase-delivery pre{max-height:360px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;direction:rtl;text-align:right;margin:12px 0;padding:13px;border-radius:10px;background:#f0f4ed;color:#34443a;font:11px/2 Tahoma, sans-serif}.purchase-delivery button{margin-top:5px}.reward-mode.is-service{background:#e8f2e7;color:#426a48}
+
+
+/* Saved projects and issue reporting */
+.bot-card-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #edf0e9}
+.bot-card-actions .quiet-button{font-size:10px;padding:8px 12px;border-radius:11px}
+.bot-card-actions button:disabled{opacity:.55;cursor:wait}
+.saved-projects-panel{margin:20px 0}
+.saved-projects-list{display:grid;gap:10px}
+.saved-project-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-bottom:1px solid #edf0e9}
+.saved-project-row:last-child{border-bottom:0}
+.saved-project-row b,.saved-project-row small{display:block}
+.saved-project-row b{font-size:13px}
+.saved-project-row small{font-size:10px;color:var(--muted);margin-top:3px}
+.saved-project-row p{font-size:11px;color:var(--muted);margin:5px 0 0;line-height:1.8}
+.saved-project-actions{display:flex;gap:8px;flex-shrink:0;align-items:center}
+.saved-project-actions .quiet-button{font-size:10px;padding:8px 11px;border:1px solid #e5ebe2;border-radius:11px;background:#f8faf5;cursor:pointer}
+@media(max-width:600px){.saved-project-row{align-items:flex-start;flex-direction:column}.saved-project-actions{width:100%}}
