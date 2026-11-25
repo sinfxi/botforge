@@ -1,5 +1,22 @@
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "strict-origin-when-cross-origin" };
 const MAX_UPLOAD = 5 * 1024 * 1024;
+const TELEGRAM_USER_MENU_KEYBOARD = {
+  keyboard: [
+    [{text:"👤 حساب من"},{text:"💰 کیف پول"}],
+    [{text:"📦 پروژه‌های من"},{text:"📨 درخواست‌های من"}],
+    [{text:"📚 کاتالوگ پروژه‌ها"},{text:"⭐ ذخیره‌شده‌ها"}],
+    [{text:"🔎 جستجوی کاربر"},{text:"⬇️ دانلود پروژه"}],
+    [{text:"🧾 سفارش‌ها و مزایا"},{text:"🚩 گزارش مشکل"}],
+    [{text:"⬇️ تاریخچه دانلود"},{text:"🚩 گزارش‌های من"}],
+    [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
+    [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
+    [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
+    [{text:"🔗 قطع اتصال تلگرام"}],
+    [{text:"❔ راهنما"}]
+  ],
+  resize_keyboard:true,
+  is_persistent:true
+};
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...headers } });
@@ -163,7 +180,14 @@ async function handleTelegramWebhook(request, env) {
   if (commandName === "/start") {
     const code = (parts[1] || "").toUpperCase().replace(/[^A-Z0-9]/g,"");
     if (!code) {
-      await telegramSend(env, chatId, "سلام! 👋 برای اتصال حساب سایتت، شناسه ۴ رقمی را این‌طور بفرست:\n/connect 1234\n\nبعد وارد همان حساب در سایت شو و درخواست اتصال را تأیید کن.");
+      const linked = chatType === "private"
+        ? await env.DB.prepare("SELECT u.public_id,u.username,u.status FROM telegram_links l JOIN users u ON u.id=l.user_id WHERE l.telegram_user_id=? LIMIT 1").bind(String(from.id)).first()
+        : null;
+      if (linked?.status === "active") {
+        await telegramSend(env, chatId, "سلام " + safeText(from.first_name || linked.username,40) + " 👋\\nمنوی FXI BotForge آماده است. از دکمه‌های پایین چت استفاده کن.", TELEGRAM_USER_MENU_KEYBOARD);
+      } else {
+        await telegramSend(env, chatId, "سلام! 👋\\nبرای شروع، حسابت را با شناسه ۴ رقمی متصل کن:\\n/connect 1234\\n\\nبعد درخواست اتصال را از داخل همان حساب در سایت تأیید کن.", {keyboard:[[{text:"🔗 اتصال حساب"},{text:"❔ راهنما"}]],resize_keyboard:true,is_persistent:true});
+      }
       return json({ok:true});
     }
     const record = await env.DB.prepare("SELECT id,user_id FROM telegram_link_codes WHERE code_hash=? AND used_at IS NULL AND expires_at>?").bind(await sha256(code),now()).first();
@@ -175,7 +199,7 @@ async function handleTelegramWebhook(request, env) {
         env.DB.prepare("UPDATE telegram_link_codes SET used_at=? WHERE id=? AND used_at IS NULL").bind(now(),record.id)
       ]);
       const user = await env.DB.prepare("SELECT public_id,username FROM users WHERE id=?").bind(record.user_id).first();
-      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت به FXI BotForge متصل شد.\nشناسه سایت: " + user.public_id + "\nنام کاربری: @" + user.username + "\n\nاز این پس اعلان‌های مهم حسابت را همین‌جا دریافت می‌کنی.\nبرای امکانات مدیریتی: /admin");
+      await telegramSend(env, chatId, "✅ حساب تلگرام با موفقیت متصل شد.\\nشناسه سایت: " + user.public_id + "\\nنام کاربری: @" + user.username + "\\n\\nمنوی دکمه‌ای پایین چت هم فعال شد؛ برای استفاده از امکانات، یکی از دکمه‌ها را انتخاب کن.", TELEGRAM_USER_MENU_KEYBOARD);
     } catch (error) {
       console.error("Telegram account link failed:", error);
       await telegramSend(env, chatId, "اتصال انجام نشد؛ ممکن است این حساب تلگرام قبلاً به حساب دیگری وصل شده باشد.");
@@ -190,21 +214,7 @@ async function handleTelegramWebhook(request, env) {
   if (chatType === "private") {
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_bot_states (telegram_user_id TEXT PRIMARY KEY, state TEXT NOT NULL, payload_json TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const linkedAccount = await env.DB.prepare("SELECT u.id,u.public_id,u.username,u.role,u.status FROM telegram_links l JOIN users u ON u.id=l.user_id WHERE l.telegram_user_id=? LIMIT 1").bind(String(from.id)).first();
-    const menuKeyboard = {
-      keyboard: [
-        [{text:"👤 حساب من"},{text:"💰 کیف پول"}],
-        [{text:"📦 پروژه‌های من"},{text:"📨 درخواست‌های من"}],
-        [{text:"📚 کاتالوگ پروژه‌ها"},{text:"⭐ ذخیره‌شده‌ها"}],
-        [{text:"🔎 جستجوی کاربر"},{text:"⬇️ دانلود پروژه"}],
-        [{text:"🧾 سفارش‌ها و مزایا"},{text:"🚩 گزارش مشکل"}],
-        [{text:"⬇️ تاریخچه دانلود"},{text:"🚩 گزارش‌های من"}],
-        [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
-        [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
-        [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
-        [{text:"🔗 قطع اتصال تلگرام"}],
-        [{text:"❔ راهنما"}]
-      ], resize_keyboard:true, is_persistent:true
-    };
+    const menuKeyboard = TELEGRAM_USER_MENU_KEYBOARD;
     const sendHome = async () => {
       if (!linkedAccount || linkedAccount.status !== "active") {
         await telegramSend(env,chatId,"برای استفاده از امکانات حساب، ابتدا حساب سایتت را متصل کن:\n/connect 1234\n\nبعد درخواست اتصال را از داخل همان حساب در سایت تأیید کن.");
@@ -222,6 +232,10 @@ async function handleTelegramWebhook(request, env) {
     let statePayload = {};
     try { statePayload = JSON.parse(stateRow?.payload_json || "{}"); } catch {}
     const userAction = textValue;
+    if (userAction === "🔗 اتصال حساب") {
+      await telegramSend(env,chatId,"برای اتصال حساب، شناسه ۴ رقمی را بفرست؛ نمونه: /connect 1234");
+      return json({ok:true});
+    }
     if (commandName === "/menu" || commandName === "/account" || userAction === "🏠 منوی اصلی") { await sendHome(); return json({ok:true}); }
     if (commandName === "/projects" || commandName === "/wallet" || commandName === "/rewards" || commandName === "/gift" || commandName === "/notifications" || commandName === "/support") {
       if (!linkedAccount) { await sendHome(); return json({ok:true}); }
