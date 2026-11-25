@@ -462,7 +462,8 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
 .community-orb{animation:none!important}
 .hero-visual{perspective:none}
 .hero-cyrus-art,.hero-visual:hover .hero-cyrus-art{transform:none!important;filter:saturate(.96) contrast(1.03)}
-.brand-mark,.brand:hover .brand-mark{transform:none!important}
+.brand-mark,.brand:hover .brand-mark,.brand:hover{transform:none!important}
+.bot-card:hover::after{transform:none!important}
 .panel,.stat,.bot-card,.auth-card,.setup .card,.community-wallet,
 .community-lucky,.ncoin-showcase,.creator-shortcuts>a,.admin-launchpad>a,
 .telegram-connect-panel,.workspace-toolbar,.announcement-float{
