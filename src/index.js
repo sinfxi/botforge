@@ -845,11 +845,19 @@ async function handleApi(request, env, url) {
       const status=action==="deliver"?"delivered":action==="approve"?"approved":"rejected";
       if(purchase.status==="rejected"||purchase.status==="delivered")return json({error:"این درخواست قبلاً نهایی شده است."},409);
       if(status==="rejected") {
-        await env.DB.prepare("UPDATE ncoin_purchases SET status='rejected',updated_at=? WHERE id=?").bind(now(),purchase.id).run();
-        await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(purchase.price,now(),purchase.user_id).run();
-        await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),purchase.user_id,purchase.price,"refund","بازگشت وجه خرید ردشده").run();
+        // Reject + refund must be one transaction. changes() prevents a second
+        // concurrent rejection from refunding the same purchase twice.
+        const refundResults = await env.DB.batch([
+          env.DB.prepare("UPDATE ncoin_purchases SET status='rejected',updated_at=? WHERE id=? AND status NOT IN ('rejected','delivered')").bind(now(),purchase.id),
+          env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(purchase.price,now(),purchase.user_id),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),purchase.user_id,purchase.price,"refund","بازگشت وجه خرید ردشده")
+        ]);
+        const changed = Number(refundResults?.[0]?.meta?.changes ?? refundResults?.[0]?.changes ?? 0);
+        if (!changed) return json({error:"این درخواست قبلاً نهایی شده است."},409);
       } else {
-        await env.DB.prepare("UPDATE ncoin_purchases SET status=?,updated_at=? WHERE id=?").bind(status,now(),purchase.id).run();
+        const updated = await env.DB.prepare("UPDATE ncoin_purchases SET status=?,updated_at=? WHERE id=? AND status NOT IN ('rejected','delivered')").bind(status,now(),purchase.id).run();
+        const changed = Number(updated?.meta?.changes ?? updated?.changes ?? 0);
+        if (!changed) return json({error:"این درخواست قبلاً نهایی شده است."},409);
       }
       await notify(env,purchase.user_id,"وضعیت سفارش F COIN تغییر کرد",status==="rejected"?"سفارش رد شد و سکه‌ها به کیف پول برگشتند.":status==="approved"?"سفارش تأیید شد و در صف انجام قرار گرفت.":"جایزه خریداری‌شده تحویل شد.","info");
       return json({ok:true,status});
