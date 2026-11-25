@@ -74,7 +74,7 @@ The connected `@FxiCode_bot` account can manage the core user workspace without 
 - Read notifications and announcements, message support, and unlink the Telegram account.
 - The existing permission-checked manager menu remains separate and is shown only to linked active manager accounts.
 
-The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
+Managers with the audit permission can review open project reports with `/reports` and close them with `/resolve <report-id>`; the reporter receives a notification. The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, saved-project list, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
 
 User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
 
