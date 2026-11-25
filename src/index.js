@@ -1086,6 +1086,21 @@ async function handleApi(request, env, url) {
     return json({ ok: true }, 200, { "set-cookie": cookie("fxi_session", "", 0) });
   }
 
+  if (path === "/api/auth/sessions/revoke-others" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const token = readCookie(request, "fxi_session");
+    if (!token) return json({error:"نشست فعلی پیدا نشد؛ دوباره وارد حساب شو."},401);
+    const tokenHash = await sha256(token);
+    const current = await env.DB.prepare("SELECT id FROM sessions WHERE user_id=? AND token_hash=? AND expires_at>?").bind(auth.user.id,tokenHash,now()).first();
+    if (!current) return json({error:"نشست فعلی معتبر نیست؛ دوباره وارد حساب شو."},401);
+    const result = await env.DB.prepare("DELETE FROM sessions WHERE user_id=? AND token_hash<>?").bind(auth.user.id,tokenHash).run();
+    const revoked = Number(result?.meta?.changes ?? result?.changes ?? 0);
+    await audit(env,auth.user.id,"auth.sessions.revoke_others","session",auth.user.id,{revoked});
+    return json({ok:true,revoked});
+  }
+
   if (path === "/api/me" && method === "GET") {
     const user = await currentUser(request, env);
     return user ? json({ user }) : json({ user: null }, 401);
