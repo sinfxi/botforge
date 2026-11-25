@@ -38,7 +38,7 @@
       <div class="toolbar-actions"><span class="live-clock" id="admin-clock">● آنلاین</span><button id="admin-refresh" class="quiet-button" type="button">↻ تازه‌سازی اطلاعات</button><button id="admin-export" class="quiet-button" type="button">↓ خروجی CSV</button></div>
     </div>
 
-    <section class="admin-launchpad" aria-label="دسترسی سریع"><a href="#submissions-panel"><span>▤</span><b>صف بررسی</b><small>درخواست‌های اعضا</small></a><a href="#users-panel"><span>◎</span><b>مدیریت کاربران</b><small>اعضا و دسترسی‌ها</small></a><a href="#publish-panel"><span>⌘</span><b>انتشار محتوا</b><small>کد، ZIP و فایل</small></a><a href="/owner-inbox.html"><span>✉</span><b>گفت‌وگوی خصوصی</b><small>پیام‌ها و سفارش‌ها</small></a><a href="/community.html"><span>✦</span><b>جامعه و N Coin</b><small>تجربه کاربران</small></a><a href="#telegram-panel"><span>✈</span><b>اتصال تلگرام</b><small>ربات FxiCode</small></a></section>\n\n    <section class="stats workspace-stats" aria-label="آمار کلی">
+    <section class="admin-launchpad" aria-label="دسترسی سریع"><a href="#submissions-panel"><span>▤</span><b>صف بررسی</b><small>درخواست‌های اعضا</small></a><a href="#users-panel"><span>◎</span><b>مدیریت کاربران</b><small>اعضا و دسترسی‌ها</small></a><a href="#publish-panel"><span>⌘</span><b>انتشار محتوا</b><small>کد، ZIP و فایل</small></a><a href="/owner-inbox.html"><span>✉</span><b>گفت‌وگوی خصوصی</b><small>پیام‌ها و سفارش‌ها</small></a><a href="/community.html"><span>✦</span><b>جامعه و N Coin</b><small>تجربه کاربران</small></a><a href="#telegram-panel"><span>✈</span><b>اتصال تلگرام</b><small>ربات FxiCode</small></a><a href="#announcements-panel"><span>♡</span><b>اطلاع‌رسانی</b><small>خبرها و کد هدیه</small></a></section>\n\n    <section class="stats workspace-stats" aria-label="آمار کلی">
       <article class="stat" data-stat="users" hidden><span>اعضای ثبت‌نام‌شده</span><strong id="stat-users">—</strong><small>حساب‌های پلتفرم</small></article>
       <article class="stat" data-stat="bots" hidden><span>سورس‌های منتشرشده</span><strong id="stat-bots">—</strong><small>در کتابخانه عمومی</small></article>
       <article class="stat" data-stat="pending" hidden><span>در صف بررسی</span><strong id="stat-pending">—</strong><small>نیازمند تصمیم مدیر</small></article>
@@ -70,7 +70,7 @@
           <label><input type="checkbox" name="permission" value="submissions" checked><span><b>بررسی سورس‌ها</b><small>مشاهده صف، تأیید یا رد درخواست</small></span></label>
           <label><input type="checkbox" name="permission" value="users"><span><b>مدیریت کاربران</b><small>مشاهده و تعلیق حساب‌های عادی</small></span></label>
           <label><input type="checkbox" name="permission" value="bots"><span><b>مدیریت کتابخانه</b><small>مشاهده و بایگانی سورس‌ها</small></span></label>
-          <label><input type="checkbox" name="permission" value="audit"><span><b>گزارش فعالیت‌ها</b><small>مشاهده رویدادهای ثبت‌شده</small></span></label>\n          <label><input type="checkbox" name="permission" value="gifts"><span><b>ساخت کد هدیه</b><small>ساخت و مشاهده کدهای N Coin</small></span></label>
+          <label><input type="checkbox" name="permission" value="audit"><span><b>گزارش فعالیت‌ها</b><small>مشاهده رویدادهای ثبت‌شده</small></span></label>\n          <label><input type="checkbox" name="permission" value="gifts"><span><b>ساخت کد هدیه</b><small>ساخت و مشاهده کدهای N Coin</small></span></label><label><input type="checkbox" name="permission" value="announcements"><span><b>اطلاع‌رسانی عمومی</b><small>انتشار خبر و کد هدیه برای همه اعضا</small></span></label>
         </div>
         <div class="form-actions"><button class="button" type="submit">ایجاد حساب مدیر <span>←</span></button><div id="manager-message" class="inline-message" role="status"></div></div>
       </form>
@@ -92,6 +92,29 @@
       <div id="gift-created" class="inline-message" hidden></div>
       <div class="manager-list-head"><div><h3>کدهای ساخته‌شده</h3><p class="panel-subtitle">کد کامل فقط لحظه ساخت نمایش داده می‌شود؛ آن را همان موقع کپی کن.</p></div><button id="gift-refresh" class="quiet-button" type="button">↻ تازه‌سازی</button></div>
       <div id="gift-list" class="data-list"><div class="skeleton-row"></div></div>
+    </section>
+
+    <section class="panel workspace-panel" id="announcements-panel" hidden>
+      <div class="panel-heading"><div><span class="eyebrow">PUBLIC ANNOUNCEMENTS</span><h2>استودیو اطلاع‌رسانی</h2><p class="panel-subtitle">خبر یا کد هدیه منتشر کن تا در صفحه اصلی و فضای شخصی همه اعضا نمایش داده شود.</p></div><span class="panel-mark">♡</span></div>
+      <form id="announcement-form" class="manager-form">
+        <div class="manager-fields">
+          <div class="field"><label for="announcement-kind">نوع انتشار</label><select id="announcement-kind"><option value="notice">اطلاعیه عمومی</option><option value="gift">کد هدیه N Coin</option></select></div>
+          <div class="field"><label for="announcement-title">عنوان</label><input id="announcement-title" maxlength="100" minlength="3" placeholder="مثلاً هدیه ویژه اعضای BotForge" required></div>
+        </div>
+        <div class="field"><label for="announcement-body">متن اطلاع‌رسانی</label><textarea id="announcement-body" rows="3" maxlength="1200" placeholder="متن کوتاه و واضح اطلاعیه…" required></textarea></div>
+        <div id="announcement-gift-fields" class="manager-fields" hidden>
+          <div class="field"><label for="announcement-amount">مقدار N Coin</label><input id="announcement-amount" type="number" min="1" max="1000000" value="250"></div>
+          <div class="field"><label for="announcement-uses">تعداد دفعات استفاده</label><input id="announcement-uses" type="number" min="1" max="10000" value="100"></div>
+        </div>
+        <div class="manager-fields">
+          <div class="field"><label for="announcement-expiry">تاریخ پایان نمایش (اختیاری)</label><input id="announcement-expiry" type="datetime-local"></div>
+          <div class="field"><label for="announcement-image">آدرس تصویر پس‌زمینه (اختیاری)</label><input id="announcement-image" type="url" placeholder="خالی = تصویر پیش‌فرض کوروش"></div>
+        </div>
+        <div class="form-actions"><button class="button" type="submit">انتشار برای همه <span>↗</span></button><div id="announcement-message" class="inline-message" role="status"></div></div>
+      </form>
+      <div id="announcement-created" class="announcement-created" hidden></div>
+      <div class="manager-list-head"><div><h3>انتشارهای قبلی</h3><p class="panel-subtitle">موارد غیرفعال‌شده دیگر برای کاربران نمایش داده نمی‌شوند.</p></div><button id="announcement-refresh" class="quiet-button" type="button">↻ تازه‌سازی</button></div>
+      <div id="announcement-list" class="data-list"><div class="skeleton-row"></div></div>
     </section>
 
     <section class="panel workspace-panel" id="publish-panel" hidden>
@@ -139,7 +162,7 @@
 (() => {
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-  const labels = { submissions: "بررسی سورس‌ها", users: "مدیریت کاربران", bots: "کتابخانه", audit: "گزارش فعالیت‌ها", gifts: "کدهای هدیه" };
+  const labels = { submissions: "بررسی سورس‌ها", users: "مدیریت کاربران", bots: "کتابخانه", audit: "گزارش فعالیت‌ها", gifts: "کدهای هدیه", announcements: "اطلاع‌رسانی" };
   const permissionKeys = Object.keys(labels);
   let me = null;
   let busy = false;
@@ -217,6 +240,11 @@
     $("#gift-list").innerHTML=data.items.length?data.items.map(item=>'<article class="data-row"><div class="row-main"><span class="row-icon">N</span><div class="row-copy"><b>••••-'+escapeHtml(item.code_hint)+'</b><small>'+number(item.amount)+' N Coin · '+number(item.used_count)+' از '+number(item.max_uses)+' استفاده · '+(item.active?'فعال':'غیرفعال')+'</small><small>انقضا: '+(item.expires_at?date(item.expires_at):'بدون انقضا')+' · '+date(item.created_at)+'</small></div></div></article>').join(""):'<div class="empty-state"><b>هنوز کد هدیه‌ای ساخته نشده</b></div>';
   }
 
+  async function loadAnnouncements() {
+    const data=await api("/api/admin/announcements");
+    $("#announcement-list").innerHTML=(data.items||[]).length?(data.items||[]).map(item=>'<article class="data-row"><div class="row-main"><span class="row-icon announcement-row-icon">♡</span><div class="row-copy"><b>'+escapeHtml(item.title)+'</b><small>'+(item.kind==="gift"?"کد هدیه · ":"اطلاعیه · ")+date(item.created_at)+' · '+(item.active?"فعال":"غیرفعال")+'</small><small>'+escapeHtml(item.body)+'</small>'+(item.gift_code?'<code class="announcement-code-preview">'+escapeHtml(item.gift_code)+'</code>':'')+'</div></div>'+(item.active?'<button class="action-button reject" data-announcement-disable="'+escapeHtml(item.id)+'">غیرفعال‌سازی</button>':'')+'</article>').join(""):'<div class="empty-state"><b>هنوز اطلاع‌رسانی منتشر نشده</b></div>';
+  }
+
   async function load({ silent = false } = {}) {
     if (!silent) message("در حال بررسی حساب و دریافت اطلاعات پنل…");
     try {
@@ -239,7 +267,7 @@
       showSection("manager-panel", isOwner);
       showSection("telegram-panel", isOwner);
       showSection("no-permissions", !isOwner && permissions.length === 0);
-      for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["publish-panel","bots"],["audit-panel","audit"],["gifts-panel","gifts"]]) showSection(id, permissions.includes(key));
+      for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["publish-panel","bots"],["audit-panel","audit"],["gifts-panel","gifts"],["announcements-panel","announcements"]]) showSection(id, permissions.includes(key));
       const overview = await api("/api/admin/overview");
       setStat("users", overview.users);
       setStat("bots", overview.bots);
@@ -254,6 +282,7 @@
       if (permissions.includes("audit")) tasks.push(loadAudit());
       if (isOwner) tasks.push(loadManagers());
       if (permissions.includes("gifts")) tasks.push(loadGifts());
+      if (permissions.includes("announcements")) tasks.push(loadAnnouncements());
       const results = await Promise.allSettled(tasks);
       const failures = results.filter(result => result.status === "rejected");
       if (!silent) message(failures.length ? "پنل باز شد، اما بارگذاری بخشی از اطلاعات ناموفق بود. می‌توانی دوباره تلاش کنی." : "اتصال برقرار است؛ اطلاعات پنل به‌روز شد.", failures.length ? "warning" : "success");
@@ -293,6 +322,32 @@
     }catch(error){$("#gift-message").textContent=error.message||"ساخت کد ناموفق بود."}finally{button.disabled=false}
   });
   $("#gift-refresh").addEventListener("click",()=>loadGifts().catch(error=>$("#gift-message").textContent=error.message));
+
+  $("#announcement-kind").addEventListener("change",()=>{$("#announcement-gift-fields").hidden=$("#announcement-kind").value!=="gift";});
+  $("#announcement-form").addEventListener("submit",async event=>{
+    event.preventDefault();const button=event.submitter;button.disabled=true;$("#announcement-message").textContent="در حال انتشار…";$("#announcement-created").hidden=true;
+    try{
+      const expiry=$("#announcement-expiry").value?new Date($("#announcement-expiry").value).toISOString():null;
+      const payload={kind:$("#announcement-kind").value,title:$("#announcement-title").value.trim(),body:$("#announcement-body").value.trim(),amount:$("#announcement-amount").value,max_uses:$("#announcement-uses").value,expires_at:expiry,image_url:$("#announcement-image").value.trim()||null};
+      const result=await api("/api/admin/announcements",{method:"POST",body:JSON.stringify(payload)});
+      if(result.gift_code){
+        $("#announcement-created").hidden=false;
+        $("#announcement-created").innerHTML='<div><b>کد هدیه ساخته و منتشر شد</b><code>'+escapeHtml(result.gift_code)+'</code><small>'+number(result.amount)+' N Coin · '+number(result.max_uses)+' بار قابل استفاده</small></div><button type="button" class="button" id="announcement-copy-code">کپی کد</button>';
+        $("#announcement-copy-code").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(result.gift_code);$("#announcement-message").textContent="کد کپی شد."}catch{$("#announcement-message").textContent="کپی خودکار در دسترس نیست؛ کد را دستی انتخاب کن."}});
+      }
+      $("#announcement-message").textContent="اطلاع‌رسانی برای همه منتشر شد.";
+      event.currentTarget.reset();$("#announcement-gift-fields").hidden=true;await loadAnnouncements();
+    }catch(error){$("#announcement-message").textContent=error.message||"انتشار ناموفق بود."}
+    finally{button.disabled=false}
+  });
+  $("#announcement-refresh").addEventListener("click",()=>loadAnnouncements().catch(e=>$("#announcement-message").textContent=e.message));
+  $("#announcement-list").addEventListener("click",async event=>{
+    const button=event.target.closest("[data-announcement-disable]");if(!button)return;
+    if(!confirm("این اطلاع‌رسانی از صفحات کاربران برداشته شود؟"))return;
+    button.disabled=true;try{await api("/api/admin/announcements/"+encodeURIComponent(button.dataset.announcementDisable),{method:"DELETE"});await loadAnnouncements()}catch(e){$("#announcement-message").textContent=e.message;button.disabled=false}
+  });
+
+
 
   const publishFile = $("#publish-file");
   const publishMode = () => $("input[name='kind']:checked", $("#publish-form")).value;
