@@ -54,3 +54,19 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 ## Current limitations
 - This initial version does not include password reset, email verification, public user profiles, advanced search/filtering, or automated malware scanning.
 - Admin role assignment is intentionally not exposed to normal users; add admins through a controlled database operation.
+
+## Telegram account workspace
+
+The connected `@FxiCode_bot` account can manage the core user workspace without opening the website:
+- Link through the website's one-time code or request a link with `/connect 1234` and confirm it while signed in on the website.
+- View account details, published projects, submission history, wallet balance, and recent N Coin transactions.
+- Submit a project ZIP from Telegram through a guided flow: title, description, category, rights confirmation, and ZIP document upload (5 MiB maximum).
+- Claim eligible one-time lucky-ID rewards, browse and purchase N Coin rewards with a confirmation step, and redeem gift codes.
+- Read notifications and announcements, message support, and unlink the Telegram account.
+- The existing permission-checked manager menu remains separate and is shown only to linked active manager accounts.
+
+The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
+
+User commands: `/menu`, `/account`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
+
+After deploying an updated bot, an owner should open the BotForge admin panel and run **ثبت وب‌هوک در تلگرام** once to refresh Telegram's command list.
