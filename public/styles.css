@@ -450,3 +450,48 @@ img{height:auto}
 @media(prefers-reduced-motion:reduce){
   .brand-mark,.brand,.hero-cyrus-art{transition:none!important;animation:none!important}
 }
+
+/* FXI BotForge — stable hover and low-cost rendering */
+body{perspective:none;background-attachment:scroll}
+body::before,body::after{animation:none!important;filter:none;opacity:.28}
+.topbar,.workspace-topbar,.visual-card,.auth-card,.setup .card,
+.workspace-identity,.workspace-message,.workspace-toolbar,.trust-item,
+.announcement-float::before{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.hero-shell::before,.visual-glow,.visual-card,.hero-cyrus-art,
+.page-home .hero-copy-wrap,.page-home .hero-visual,.trust-item,.bot-card,
+.community-orb{animation:none!important}
+.hero-visual{perspective:none}
+.hero-cyrus-art,.hero-visual:hover .hero-cyrus-art{transform:none!important;filter:saturate(.96) contrast(1.03)}
+.brand-mark,.brand:hover .brand-mark{transform:none!important}
+.panel,.stat,.bot-card,.auth-card,.setup .card,.community-wallet,
+.community-lucky,.ncoin-showcase,.creator-shortcuts>a,.admin-launchpad>a,
+.telegram-connect-panel,.workspace-toolbar,.announcement-float{
+  transform:none!important;transform-style:flat!important
+}
+.panel:hover,.stat:hover,.bot-card:hover,.auth-card:hover,.setup .card:hover,
+.community-wallet:hover,.community-lucky:hover,.creator-shortcuts>a:hover,
+.admin-launchpad>a:hover,.telegram-connect-panel:hover,
+.announcement-float:hover,.hero-visual:hover .visual-core,
+.hero-visual:hover .card-top,.hero-visual:hover .card-bottom,
+.brand:hover,.brand:hover .brand-mark{
+  transform:none!important
+}
+.button:hover,.quiet-button:hover,.actions button:hover,
+.action-button:hover,.action-link:hover,.item:hover,.submission:hover,
+.data-row:hover,.reward-item:hover,.steps article:hover{
+  transform:none!important
+}
+.panel,.stat,.bot-card,.auth-card,.setup .card,.community-wallet,
+.community-lucky,.ncoin-showcase,.creator-shortcuts>a,.admin-launchpad>a,
+.telegram-connect-panel,.workspace-toolbar,.announcement-float,
+.button,.quiet-button,.actions button,.action-button,.action-link,
+.item,.submission,.data-row,.reward-item,.steps article{
+  transition:background-color .18s ease,border-color .18s ease,
+             box-shadow .18s ease,color .18s ease!important
+}
+.announcement-float{perspective:none}
+@media(prefers-reduced-motion:reduce){
+  body::before,body::after,.hero-shell::before,.visual-glow,.visual-card,
+  .hero-cyrus-art,.page-home .hero-copy-wrap,.page-home .hero-visual,
+  .trust-item,.bot-card,.community-orb{animation:none!important}
+}
