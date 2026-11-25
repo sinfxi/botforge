@@ -12,7 +12,7 @@ const TELEGRAM_USER_MENU_KEYBOARD = {
     [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
     [{text:"🎯 پاداش روزانه"},{text:"📊 خلاصه حساب"}],
     [{text:"🏆 برترین سازندگان"},{text:"📣 اطلاعیه‌ها"}],
-    [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
+    [{text:"🛠 مدیریت"}],
     [{text:"🔗 قطع اتصال تلگرام"}],
     [{text:"❔ راهنما"}]
   ],
@@ -896,14 +896,18 @@ async function handleTelegramWebhook(request, env) {
     const lock=await env.DB.prepare("INSERT OR IGNORE INTO submission_review_locks(submission_id,manager_id) VALUES(?,?)").bind(submission.id,manager.id).run();
     if(!Number(lock.meta?.changes||0)){await telegramSend(env,chatId,"این درخواست هم‌زمان توسط مدیر دیگری در حال بررسی است.",menu);return json({ok:true});}
     await env.FILES.put(publishedKey,source);
-    let insertedBot=false;
     try{
-      await env.DB.prepare("INSERT INTO bots(id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES(?,?,?,?,?,?,?,?,?)").bind(id(),slug,submission.title,submission.description,submission.category,publishedKey,submission.original_filename,submission.file_size,submission.user_id).run();
-      insertedBot=true;
-      const done=await env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(manager.id,now(),submission.id).run();
-      if(!Number(done.meta?.changes||0))throw new Error("Submission was reviewed concurrently.");
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_project_rewards (submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL CHECK(amount=100), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+      await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
+      const published=await env.DB.batch([
+        env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(manager.id,now(),submission.id),
+        env.DB.prepare("INSERT INTO bots(id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) SELECT ?,?,?,?,?,?,?,?,? WHERE changes()=1").bind(id(),slug,submission.title,submission.description,submission.category,publishedKey,submission.original_filename,submission.file_size,submission.user_id),
+        env.DB.prepare("INSERT OR IGNORE INTO ncoin_project_rewards(submission_id,user_id,amount) SELECT ?,?,100 WHERE changes()=1").bind(submission.id,submission.user_id),
+        env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=? AND changes()=1").bind(now(),submission.user_id),
+        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,100,'project_approved','پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده' WHERE changes()=1").bind(id(),submission.user_id)
+      ]);
+      if(!Number(published?.[0]?.meta?.changes||0))throw new Error("Submission was reviewed concurrently.");
     }catch(error){
-      if(insertedBot)await env.DB.prepare("DELETE FROM bots WHERE slug=? AND uploader_id=? AND object_key=?").bind(slug,submission.user_id,publishedKey).run();
       await env.FILES.delete(publishedKey);
       await env.DB.prepare("DELETE FROM submission_review_locks WHERE submission_id=? AND manager_id=?").bind(submission.id,manager.id).run();
       await telegramSend(env,chatId,"انتشار انجام نشد؛ درخواست در صف بررسی باقی ماند. از پنل سایت هم می‌توانی بررسی کنی.",menu);
@@ -913,9 +917,7 @@ async function handleTelegramWebhook(request, env) {
     await env.FILES.delete(submission.object_key);
     await notify(env,submission.user_id,"سورس تو منتشر شد! 🎉","«"+safeText(submission.title,100)+"» پس از بررسی تأیید و در BotForge منتشر شد.","success");
     await audit(env,manager.id,"submission.approve.telegram","submission",submission.id,{slug});
-    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
-    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
-    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,100,"project_approved","پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده").run();
+
     await telegramSend(env,chatId,"🎉 پروژه تأیید و منتشر شد.\nعنوان: "+safeText(submission.title,100)+"\nشناسه انتشار: "+slug+"\nپاداش ۱۰۰ N Coin برای صاحب پروژه ثبت شد.",menu);
     return json({ok:true});
   }
@@ -1813,12 +1815,23 @@ async function handleApi(request, env, url) {
       const publishedKey = `published/${slug}.zip`;
       const source = await env.FILES?.get(submission.object_key, "arrayBuffer");
       if (!source) return json({ error: "فایل خصوصی درخواست پیدا نشد." }, 409);
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_project_rewards (submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL CHECK(amount=100), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+      await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
       await env.FILES.put(publishedKey, source);
+      let published;
       try {
-        await env.DB.prepare("INSERT INTO bots (id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) VALUES (?,?,?,?,?,?,?,?,?)")
-          .bind(id(), slug, submission.title, submission.description, submission.category, publishedKey, submission.original_filename, submission.file_size, submission.user_id).run();
-        await env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'")
-          .bind(admin.user.id, now(), submission.id).run();
+        published = await env.DB.batch([
+          env.DB.prepare("UPDATE submissions SET status='approved',reviewed_by=?,reviewed_at=? WHERE id=? AND status='pending'").bind(admin.user.id, now(), submission.id),
+          env.DB.prepare("INSERT INTO bots (id,slug,title,description,category,object_key,original_filename,file_size,uploader_id) SELECT ?,?,?,?,?,?,?,?,? WHERE changes()=1")
+            .bind(id(), slug, submission.title, submission.description, submission.category, publishedKey, submission.original_filename, submission.file_size, submission.user_id),
+          env.DB.prepare("INSERT OR IGNORE INTO ncoin_project_rewards(submission_id,user_id,amount) SELECT ?,?,100 WHERE changes()=1").bind(submission.id,submission.user_id),
+          env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=? AND changes()=1").bind(now(),submission.user_id),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,100,'project_approved','پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده' WHERE changes()=1").bind(id(),submission.user_id)
+        ]);
+        if (!Number(published?.[0]?.meta?.changes||0)) {
+          await env.FILES.delete(publishedKey);
+          return json({ error: "این درخواست هم‌زمان بررسی شده یا دیگر در صف انتشار نیست." }, 409);
+        }
       } catch (error) {
         await env.FILES.delete(publishedKey);
         throw error;
@@ -1826,9 +1839,6 @@ async function handleApi(request, env, url) {
       await env.FILES.delete(submission.object_key);
       await notify(env, submission.user_id, "سورس تو منتشر شد! 🎉", `«${submission.title}» پس از بررسی تأیید و در BotForge منتشر شد.`, "success");
       await audit(env, admin.user.id, "submission.approve", "submission", submission.id, { slug });
-      await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
-      await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
-      await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,100,"project_approved","پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده").run();
       return json({ ok: true, slug });
     }
     if (path === "/api/admin/users" && method === "GET") {
