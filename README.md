@@ -13,6 +13,8 @@ FXI BotForge is a Persian-first community platform for discovering and sharing T
 - Custom F COIN services now fulfill immediately: each purchase is charged once, marked delivered, and receives a saved, account-specific starter document in purchase history. Service documents are generated from account/project metadata and clearly state when they are checklists or design briefs rather than source-code audits or finished graphic assets.
 - Purchase history exposes the full delivered document, with an in-page copy action; the delivery record is stored separately in D1 and linked to the purchase.
 - Daily F COIN check-ins with consecutive-day streaks, once-per-day atomic rewards, and a weekly 200-coin milestone.
+- Cross-platform saved projects: bookmark published projects on the website or with `/save`, browse them from the member dashboard or `/favorites`, and remove them with `/unsave`.
+- Project issue reporting from catalog cards or Telegram `/report <slug>`; reports are rate-limited, assigned tracking IDs, stored in D1, and notify the owner account.
 - Expanded F COIN catalog with 34 active rewards, including instant profile/project perks and clearly marked manual services such as README polishing, performance review, security hardening plans, and launch kits.
 - Owner and manager audit controls now enforce the dedicated announcements permission, including announcement APIs.
 
@@ -74,6 +76,6 @@ The connected `@FxiCode_bot` account can manage the core user workspace without 
 
 The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
 
-User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
+User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
 
 After deploying an updated bot, an owner should open the BotForge admin panel and run **ثبت وب‌هوک در تلگرام** once to refresh Telegram's command list.
