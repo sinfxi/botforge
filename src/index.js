@@ -208,7 +208,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/myreports — گزارش‌های ثبت‌شده من\n/track شناسه — پیگیری درخواست انتشار\n/trackreport شناسه — پیگیری گزارش مشکل\n/history — تاریخچه دانلود\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/status — خلاصه وضعیت حساب\n/checkin — پاداش حضور روزانه\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/myreports — گزارش‌های ثبت‌شده من\n/track شناسه — پیگیری درخواست انتشار\n/trackreport شناسه — پیگیری گزارش مشکل\n/history — تاریخچه دانلود\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
     return json({ok:true});
   }
   // Native self-service workspace for linked BotForge accounts.
