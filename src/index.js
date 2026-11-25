@@ -520,7 +520,7 @@ async function handleApi(request, env, url) {
     const expiresAt = instant?.days ? new Date((Number.isFinite(featureBase)?featureBase:Date.now())+instant.days*86400000).toISOString() : null;
     const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,purchasedAt,auth.user.id,reward.price).run();
     const changed = Number(update?.meta?.changes ?? update?.changes ?? 0);
-    if (!changed) return json({error:"موجودی N Coin برای خرید این جایزه کافی نیست."},400);
+    if (!changed) return json({error:"موجودی F COIN برای خرید این جایزه کافی نیست."},400);
     try {
       const statements = [
         env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price,status) VALUES(?,?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,reward.price,instant?"delivered":"pending"),
@@ -845,7 +845,7 @@ async function handleApi(request, env, url) {
       } else {
         await env.DB.prepare("UPDATE ncoin_purchases SET status=?,updated_at=? WHERE id=?").bind(status,now(),purchase.id).run();
       }
-      await notify(env,purchase.user_id,"وضعیت سفارش N Coin تغییر کرد",status==="rejected"?"سفارش رد شد و سکه‌ها به کیف پول برگشتند.":status==="approved"?"سفارش تأیید شد و در صف انجام قرار گرفت.":"جایزه خریداری‌شده تحویل شد.","info");
+      await notify(env,purchase.user_id,"وضعیت سفارش F COIN تغییر کرد",status==="rejected"?"سفارش رد شد و سکه‌ها به کیف پول برگشتند.":status==="approved"?"سفارش تأیید شد و در صف انجام قرار گرفت.":"جایزه خریداری‌شده تحویل شد.","info");
       return json({ok:true,status});
     }
 
