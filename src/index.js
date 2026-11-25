@@ -561,7 +561,7 @@ async function handleApi(request, env, url) {
   }
 
   if (path === "/api/announcements" && method === "GET") {
-    const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,image_url,created_at,expires_at FROM announcements WHERE active=1 AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 5").bind(now()).all();
+    const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,gift_amount,gift_max_uses,image_url,created_at,expires_at FROM announcements WHERE active=1 AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 5").bind(now()).all();
     return json({items:results||[]},200,{"cache-control":"public, max-age=0, s-maxage=20, stale-while-revalidate=40"});
   }
 
@@ -736,7 +736,7 @@ async function handleApi(request, env, url) {
     if (path.startsWith("/api/admin/announcements")) {
       if (admin.user.role !== "owner" && !safePermissions(admin.user.permissions_json).includes("announcements")) return json({error:"دسترسی انتشار اطلاع‌رسانی برای این حساب فعال نیست."},403);
       if (path === "/api/admin/announcements" && method === "GET") {
-        const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,image_url,active,created_at,expires_at FROM announcements ORDER BY created_at DESC LIMIT 100").all();
+        const {results=[]}=await env.DB.prepare("SELECT id,title,body,kind,gift_code,gift_amount,gift_max_uses,image_url,active,created_at,expires_at FROM announcements ORDER BY created_at DESC LIMIT 100").all();
         return json({items:results||[]});
       }
       if (path === "/api/admin/announcements" && method === "POST") {
@@ -759,7 +759,7 @@ async function handleApi(request, env, url) {
           await env.DB.prepare("INSERT INTO gift_codes(id,code_hash,code_hint,amount,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?)").bind(id(),await sha256(giftCode.toUpperCase()),giftCode.slice(-4),amount,maxUses,expiry,admin.user.id).run();
         }
         const announcementId=id();
-        await env.DB.prepare("INSERT INTO announcements(id,title,body,kind,gift_code,image_url,active,created_by,expires_at) VALUES(?,?,?,?,?,?,1,?,?)").bind(announcementId,title,message,kind,giftCode,imageUrl,admin.user.id,expiry).run();
+        await env.DB.prepare("INSERT INTO announcements(id,title,body,kind,gift_code,image_url,active,created_by,expires_at,gift_amount,gift_max_uses) VALUES(?,?,?,?,?,?,1,?,?,?,?)").bind(announcementId,title,message,kind,giftCode,imageUrl,admin.user.id,expiry,amount,maxUses).run();
         await audit(env,admin.user.id,"announcement.create","announcement",announcementId,{kind,amount,max_uses:maxUses});
         return json({ok:true,id:announcementId,kind,gift_code:giftCode,amount,max_uses:maxUses},201);
       }
