@@ -74,13 +74,14 @@ The connected `@FxiCode_bot` account can manage the core user workspace without 
 - Track submission decisions with `/track`, view report status with `/myreports` and `/trackreport`, read notifications and announcements, message support, and unlink the Telegram account.
 - The permission-checked manager menu is available only to linked, active manager accounts. Its Telegram reply-keyboard shortcuts support:
 - Reviewing pending submissions with one-tap `/approve` and `/reject` buttons; the same permission checks, publication flow, user notification, audit record, and 50 N Coin approval reward are applied.
-- Searching for a user by 4-digit public ID, viewing account status, published project count and N Coin balance, and activating/suspending eligible user accounts.
+- Searching for a user by 4-digit public ID, viewing account status, published project count and N Coin balance, and activating/suspending eligible user accounts after a second confirmation.
 - Browsing published projects and archiving one from its Telegram button; archived files are removed from KV and the action is audited.
 - Viewing open project reports and resolving them with user notification.
-- Viewing open N Coin orders and approving, delivering, or rejecting them from Telegram. Order actions are restricted to the primary account; rejection refunds the wallet atomically.
+- Viewing open N Coin orders and approving, delivering, or rejecting them only after a second confirmation. Order actions are restricted to the primary account; rejection refunds the wallet atomically.
+- Opening the private support inbox, reading recent conversations, and replying to users from Telegram. Replies are saved to the same `owner_messages` table used by the website and are sent to the user's linked Telegram chat when available.
 - Viewing permission-scoped platform statistics and opening the web admin panel.
 
-The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, saved-project list, and audit log as the website. Telegram user state is stored in D1 and expires after 30 minutes of inactivity. It does not create a second wallet or account database.
+Sensitive account and purchase actions use a confirmation step; pending confirmations and chat replies expire with the existing 30-minute Telegram state timeout. The bot uses the same D1 records, KV file storage, reward catalog, entitlement rules, saved-project list, and audit log as the website. It does not create a second wallet or account database.
 
 User commands: `/menu`, `/account`, `/catalog`, `/search`, `/download`, `/find`, `/favorites`, `/save`, `/unsave`, `/report`, `/myreports`, `/trackreport`, `/track`, `/history`, `/projects`, `/submit`, `/wallet`, `/rewards`, `/gift`, `/notifications`, `/support`, `/help`. Manager accounts can also use `/admin`.
 
