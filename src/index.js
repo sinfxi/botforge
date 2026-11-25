@@ -87,6 +87,18 @@ async function notify(env, userId, title, body, type = "info") {
   await env.DB.prepare("INSERT INTO notifications (id, user_id, title, body, type) VALUES (?, ?, ?, ?, ?)")
     .bind(id(), userId, title, body, type).run();
 }
+
+function luckyIdReward(publicId) {
+  const d = String(publicId || "");
+  if (!/^\\d{4}$/.test(d)) return null;
+  if (/^(\\d)\\1{3}$/.test(d)) return { pattern: "چهار رقم یکسان", reward: 1000, title: "شناسه افسانه‌ای" };
+  if (d === "1234" || d === "4321" || d === "2345" || d === "5432" || d === "6789" || d === "9876") return { pattern: "ترتیب پیوسته", reward: 400, title: "شناسه ترتیبی" };
+  if (d[0] === d[3] && d[1] === d[2]) return { pattern: "قرینه", reward: 300, title: "شناسه آینه‌ای" };
+  if (d[0] === d[1] && d[2] === d[3]) return { pattern: "دو جفت", reward: 200, title: "شناسه دوتایی" };
+  if ([...d].filter((x,i)=>d.indexOf(x)!==i).length >= 2) return { pattern: "سه رقم مشابه", reward: 120, title: "شناسه کمیاب" };
+  return null;
+}
+
 async function handleApi(request, env, url) {
   if (!env.DB) return json({ error: "Database binding is not configured." }, 503);
   const path = url.pathname;
@@ -181,6 +193,98 @@ async function handleApi(request, env, url) {
   if (path === "/api/me" && method === "GET") {
     const user = await currentUser(request, env);
     return user ? json({ user }) : json({ user: null }, 401);
+  }
+
+
+  if (path === "/api/community/me" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
+    const [wallet, claim, rewards, purchases, transactions] = await Promise.all([
+      env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first(),
+      env.DB.prepare("SELECT pattern,reward,claimed_at FROM ncoin_lucky_claims WHERE user_id=?").bind(auth.user.id).first(),
+      env.DB.prepare("SELECT id,title,description,price FROM ncoin_rewards WHERE active=1 ORDER BY sort_order,price").all(),
+      env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,r.title FROM ncoin_purchases p JOIN ncoin_rewards r ON r.id=p.reward_id WHERE p.user_id=? ORDER BY p.created_at DESC LIMIT 20").bind(auth.user.id).all(),
+      env.DB.prepare("SELECT amount,kind,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(auth.user.id).all()
+    ]);
+    return json({ balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[] });
+  }
+
+  if (path === "/api/community/search" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const publicId = normalizeUserId(url.searchParams.get("id"));
+    if (!/^\\d{4}$/.test(publicId)) return json({error:"شناسه باید دقیقاً ۴ رقم باشد."},400);
+    const user = await env.DB.prepare("SELECT id,public_id,username,role,created_at FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
+    if (!user) return json({error:"کاربری با این شناسه پیدا نشد."},404);
+    const projects = await env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first();
+    const wallet = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(user.id).first();
+    return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0),ncoin:Number(wallet?.balance||0)}});
+  }
+
+  if (path === "/api/community/lucky/claim" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
+    const lucky = luckyIdReward(auth.user.public_id);
+    if (!lucky) return json({ok:false,eligible:false,message:"شناسه‌ات در دسته شناسه‌های رُند جایزه‌دار نیست؛ اما می‌توانی با فعالیت در BotForge سکه جمع کنی."},200);
+    const claimId = id();
+    const inserted = await env.DB.prepare("INSERT OR IGNORE INTO ncoin_lucky_claims(user_id,pattern,reward) VALUES(?,?,?)").bind(auth.user.id,lucky.pattern,lucky.reward).run();
+    const changes = Number(inserted?.meta?.changes ?? inserted?.changes ?? 0);
+    if (!changes) return json({ok:true,claimed:false,message:"جایزه شناسه‌ات قبلاً دریافت شده است."});
+    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(lucky.reward,now(),auth.user.id).run();
+    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(claimId,auth.user.id,lucky.reward,"lucky_id","جایزه شناسه رُند: "+lucky.title).run();
+    await audit(env,auth.user.id,"ncoin.lucky.claim","user",auth.user.id,{pattern:lucky.pattern,reward:lucky.reward});
+    return json({ok:true,claimed:true,reward:lucky.reward,pattern:lucky.pattern,balance:(await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first())?.balance||lucky.reward});
+  }
+
+  if (path === "/api/community/rewards/purchase" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const body = await request.json().catch(()=>null);
+    const rewardId = safeText(body?.reward_id,80);
+    const reward = await env.DB.prepare("SELECT id,title,price FROM ncoin_rewards WHERE id=? AND active=1").bind(rewardId).first();
+    if (!reward) return json({error:"این جایزه در حال حاضر موجود نیست."},404);
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
+    const purchaseId=id();
+    const update = await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?").bind(reward.price,now(),auth.user.id,reward.price).run();
+    const changed = Number(update?.meta?.changes ?? update?.changes ?? 0);
+    if (!changed) return json({error:"موجودی N Coin برای خرید این جایزه کافی نیست."},400);
+    try {
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO ncoin_purchases(id,user_id,reward_id,price) VALUES(?,?,?,?)").bind(purchaseId,auth.user.id,reward.id,reward.price),
+        env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),auth.user.id,-reward.price,"purchase","خرید: "+reward.title)
+      ]);
+    } catch (error) {
+      await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(reward.price,now(),auth.user.id).run();
+      throw error;
+    }
+    await audit(env,auth.user.id,"ncoin.reward.purchase","reward",reward.id,{purchase_id:purchaseId,price:reward.price});
+    return json({ok:true,purchase_id:purchaseId,message:"درخواست خرید ثبت شد؛ مالک آن را بررسی می‌کند."},201);
+  }
+
+  if (path === "/api/community/owner-chat" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const {results}=await env.DB.prepare("SELECT id,sender_role,body,read_at,created_at FROM owner_messages WHERE user_id=? ORDER BY created_at ASC LIMIT 100").bind(auth.user.id).all();
+    await env.DB.prepare("UPDATE owner_messages SET read_at=? WHERE user_id=? AND sender_role='owner' AND read_at IS NULL").bind(now(),auth.user.id).run();
+    return json({items:results||[]});
+  }
+
+  if (path === "/api/community/owner-chat" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth=await requireUser(request,env);
+    if(auth.response)return auth.response;
+    const body=await request.json().catch(()=>null);
+    const message=safeText(body?.message,2000);
+    if(message.length<1)return json({error:"پیام خالی است."},400);
+    const count=await env.DB.prepare("SELECT COUNT(*) AS count FROM owner_messages WHERE user_id=? AND sender_role='user' AND created_at>?").bind(auth.user.id,new Date(Date.now()-60000).toISOString()).first();
+    if(Number(count?.count||0)>=5)return json({error:"برای جلوگیری از اسپم، هر دقیقه حداکثر ۵ پیام می‌توانی بفرستی."},429);
+    const messageId=id();
+    await env.DB.prepare("INSERT INTO owner_messages(id,user_id,sender_role,body) VALUES(?,?,'user',?)").bind(messageId,auth.user.id,message).run();
+    return json({ok:true,id:messageId},201);
   }
 
   if (path === "/api/public/stats" && method === "GET") {
@@ -330,6 +434,55 @@ async function handleApi(request, env, url) {
       }
       return json({error:"روش درخواست پشتیبانی نمی‌شود."},405);
     }
+
+    if (path === "/api/admin/owner-chat" && method === "GET") {
+      if (admin.user.role !== "owner") return json({error:"فقط مالک اصلی می‌تواند پیام‌های خصوصی را ببیند."},403);
+      const {results}=await env.DB.prepare("SELECT u.id AS user_id,u.public_id,u.username,MAX(m.created_at) AS last_message,SUM(CASE WHEN m.sender_role='user' AND m.read_at IS NULL THEN 1 ELSE 0 END) AS unread, (SELECT body FROM owner_messages x WHERE x.user_id=u.id ORDER BY x.created_at DESC LIMIT 1) AS last_body FROM users u JOIN owner_messages m ON m.user_id=u.id GROUP BY u.id ORDER BY last_message DESC LIMIT 100").all();
+      return json({items:results||[]});
+    }
+    const ownerThread=path.match(/^\\/api\\/admin\\/owner-chat\\/([0-9a-f-]+)$/i);
+    if(ownerThread && method === "GET") {
+      if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
+      const {results}=await env.DB.prepare("SELECT id,sender_role,body,read_at,created_at FROM owner_messages WHERE user_id=? ORDER BY created_at ASC LIMIT 200").bind(ownerThread[1]).all();
+      await env.DB.prepare("UPDATE owner_messages SET read_at=? WHERE user_id=? AND sender_role='user' AND read_at IS NULL").bind(now(),ownerThread[1]).run();
+      return json({items:results||[]});
+    }
+    if(ownerThread && method === "POST") {
+      if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+      if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
+      const body=await request.json().catch(()=>null), message=safeText(body?.message,2000);
+      if(!message)return json({error:"پیام خالی است."},400);
+      const target=await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active'").bind(ownerThread[1]).first();
+      if(!target)return json({error:"کاربر پیدا نشد."},404);
+      await env.DB.prepare("INSERT INTO owner_messages(id,user_id,sender_role,body) VALUES(?,?,'owner',?)").bind(id(),target.id,message).run();
+      await notify(env,target.id,"پاسخ جدید از مالک BotForge","برای مشاهده پاسخ، وارد بخش گفت‌وگو با مالک شو.","info");
+      return json({ok:true},201);
+    }
+    if(path === "/api/admin/ncoin/purchases" && method === "GET") {
+      if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
+      const {results}=await env.DB.prepare("SELECT p.id,p.price,p.status,p.created_at,u.public_id,u.username,r.title FROM ncoin_purchases p JOIN users u ON u.id=p.user_id JOIN ncoin_rewards r ON r.id=p.reward_id ORDER BY p.created_at DESC LIMIT 100").all();
+      return json({items:results||[]});
+    }
+    const purchaseStatus=path.match(/^\\/api\\/admin\\/ncoin\\/purchases\\/([0-9a-f-]+)\\/(approve|deliver|reject)$/i);
+    if(purchaseStatus && method==="POST") {
+      if(!sameOrigin(request))return json({error:"درخواست نامعتبر است."},403);
+      if(admin.user.role!=="owner")return json({error:"فقط مالک اصلی دسترسی دارد."},403);
+      const purchase=await env.DB.prepare("SELECT id,user_id,price,status FROM ncoin_purchases WHERE id=?").bind(purchaseStatus[1]).first();
+      if(!purchase)return json({error:"خرید پیدا نشد."},404);
+      const action=purchaseStatus[2].toLowerCase();
+      const status=action==="deliver"?"delivered":action==="approve"?"approved":"rejected";
+      if(purchase.status==="rejected"||purchase.status==="delivered")return json({error:"این درخواست قبلاً نهایی شده است."},409);
+      if(status==="rejected") {
+        await env.DB.prepare("UPDATE ncoin_purchases SET status='rejected',updated_at=? WHERE id=?").bind(now(),purchase.id).run();
+        await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=?").bind(purchase.price,now(),purchase.user_id).run();
+        await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),purchase.user_id,purchase.price,"refund","بازگشت وجه خرید ردشده").run();
+      } else {
+        await env.DB.prepare("UPDATE ncoin_purchases SET status=?,updated_at=? WHERE id=?").bind(status,now(),purchase.id).run();
+      }
+      await notify(env,purchase.user_id,"وضعیت سفارش N Coin تغییر کرد",status==="rejected"?"سفارش رد شد و سکه‌ها به کیف پول برگشتند.":status==="approved"?"سفارش تأیید شد و در صف انجام قرار گرفت.":"جایزه خریداری‌شده تحویل شد.","info");
+      return json({ok:true,status});
+    }
+
     const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : null;
     if (admin.user.role !== "owner" && capability) {
       const permissions = safePermissions(admin.user.permissions_json);
