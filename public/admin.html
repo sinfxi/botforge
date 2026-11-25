@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="مرکز مدیریت FXI BotForge">
   <title>مرکز مدیریت | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=command-center-20261125">
+  <link rel="stylesheet" href="/styles.css?v=announcements-3d-20261125">
+  <link rel="icon" type="image/webp" href="/assets/cyrus-hero.webp">
 </head>
 <body class="page-admin">
   <header class="topbar workspace-topbar">
@@ -267,6 +268,7 @@
       showSection("manager-panel", isOwner);
       showSection("telegram-panel", isOwner);
       showSection("no-permissions", !isOwner && permissions.length === 0);
+      const announcementShortcut = $('a[href="#announcements-panel"]'); if (announcementShortcut) announcementShortcut.hidden = !permissions.includes("announcements");
       for (const [id, key] of [["submissions-panel","submissions"],["users-panel","users"],["bots-panel","bots"],["publish-panel","bots"],["audit-panel","audit"],["gifts-panel","gifts"],["announcements-panel","announcements"]]) showSection(id, permissions.includes(key));
       const overview = await api("/api/admin/overview");
       setStat("users", overview.users);
