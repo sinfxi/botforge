@@ -8,13 +8,13 @@
   <title>FXI BotForge — خانه سازندگان</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/styles.css?v=fcoin-refresh-20261125">\n  <style>.guest-preview .topbar nav,.guest-preview .trust-strip,.guest-preview #explore,.guest-preview .live-metrics,.guest-preview .how-section,.guest-preview footer,.guest-preview .hero-actions .text-link{display:none!important}.guest-preview .hero{min-height:calc(100vh - 84px);display:flex;align-items:center}.guest-preview .hero-shell{padding-top:72px;padding-bottom:72px}.guest-preview .hero-copy{max-width:620px}.guest-preview .hero-actions{margin-top:30px}.guest-preview .topbar{justify-content:space-between}</style>
+  <link rel="stylesheet" href="/styles.css?v=fxi-polish-20261125">\n  <style>.guest-preview .topbar nav,.guest-preview .trust-strip,.guest-preview #explore,.guest-preview .live-metrics,.guest-preview .how-section,.guest-preview footer,.guest-preview .hero-actions .text-link{display:none!important}.guest-preview .hero{min-height:calc(100vh - 84px);display:flex;align-items:center}.guest-preview .hero-shell{padding-top:72px;padding-bottom:72px}.guest-preview .hero-copy{max-width:620px}.guest-preview .hero-actions{margin-top:30px}.guest-preview .topbar{justify-content:space-between}</style>
   <script src="/app.js?v=resilient-20261124" defer></script>
   <link rel="icon" type="image/webp" href="/assets/cyrus-hero.webp">
 </head>
 <body class="page-home guest-preview">
   <header class="topbar">
-    <a class="brand" href="/" aria-label="FXI BotForge"><span class="brand-mark"><img src="/assets/cyrus-hero.webp" alt=""></span><span>FXI <b>BotForge</b></span></a>
+    <a class="brand" href="/" aria-label="FXI BotForge"><span class="brand-mark"><img src="/assets/cyrus-hero.webp?v=fxi-polish-20261125" alt="" width="46" height="46" decoding="async"></span><span>FXI <b>BotForge</b></span></a>
     <nav aria-label="ناوبری اصلی"><a href="#explore">اکتشاف پروژه‌ها</a><a href="/community.html">جامعه و F COIN</a><a href="#features">امکانات</a><a href="#how">مسیر انتشار</a></nav>
     <a class="button button-small" href="/login.html">ثبت‌نام / ورود <span>↗</span></a>
   </header>
@@ -30,7 +30,7 @@
           <div class="hero-note"><span class="note-icon">✓</span><span>نمای عمومی محدود · برای دیدن پروژه‌ها و امکانات، ابتدا حساب بساز</span></div>
         </div>
         <div class="hero-visual" aria-hidden="true">
-          <img class="hero-cyrus-art" src="/assets/cyrus-hero.webp" alt="">
+          <img class="hero-cyrus-art" src="/assets/cyrus-hero.webp?v=fxi-polish-20261125" alt="" width="500" height="311" fetchpriority="high" decoding="async">
           <div class="visual-card card-top"><span class="visual-card-icon">✦</span><span><strong>الهام از تاریخ، ساختن آینده</strong><small>FXI BotForge · Build & Grow</small></span></div>
           <div class="visual-card card-bottom"><span class="visual-card-icon">⌘</span><span><strong>جامعه سازندگان</strong><small>کد، ایده و تجربه در یک‌جا</small></span></div>
           <span class="hero-orbit-label">CYRUS · BUILD · SHARE · GROW</span>
@@ -67,7 +67,7 @@
     </section>
   <section class="announcement-slot" id="announcement-slot" aria-label="اطلاع‌رسانی عمومی" hidden><div id="announcement-feed" class="announcement-feed"></div></section>
   </main>
-  <footer><a class="brand" href="/"><span class="brand-mark"><img src="/assets/cyrus-hero.webp" alt=""></span><span>FXI <b>BotForge</b></span></a><span>ساخته‌شده برای کسانی که دوست دارند چیزهای تازه بسازند.</span></footer>
+  <footer><a class="brand" href="/"><span class="brand-mark"><img src="/assets/cyrus-hero.webp?v=fxi-polish-20261125" alt="" width="46" height="46" decoding="async"></span><span>FXI <b>BotForge</b></span></a><span>ساخته‌شده برای کسانی که دوست دارند چیزهای تازه بسازند.</span></footer>
 <script>(function(){const slot=document.getElementById("announcement-slot"),feed=document.getElementById("announcement-feed"),dismissed=new Set();const esc=v=>String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));async function load(){try{const r=await fetch("/api/announcements",{cache:"no-store"}),d=await r.json(),items=(d.items||[]).filter(x=>!dismissed.has(x.id)).slice(0,3);if(!items.length){slot.hidden=true;return}feed.innerHTML=items.map(x=>'<article class="announcement-float '+(x.kind==="gift"?"is-gift":"is-notice")+'" data-announcement="'+esc(x.id)+'"><div class="announcement-content"><span class="announcement-kicker">'+(x.kind==="gift"?"هدیه ویژه اعضا":"اطلاعیه عمومی")+'</span><h3>'+esc(x.title)+'</h3><p>'+esc(x.body)+'</p>'+(x.gift_code?'<small class="announcement-gift-meta">'+esc(Number(x.gift_amount||0).toLocaleString("fa-IR"))+' F COIN · '+esc(Number(x.gift_max_uses||0).toLocaleString("fa-IR"))+' بار قابل استفاده</small><div class="announcement-gift-code"><code>'+esc(x.gift_code)+'</code><button type="button" data-copy-code="'+esc(x.id)+'">کپی کد</button></div>':'')+'</div><button class="announcement-dismiss" type="button" aria-label="بستن" data-dismiss="'+esc(x.id)+'">×</button></article>').join("");items.forEach(x=>{const el=feed.querySelector('[data-announcement="'+x.id+'"]');if(el&&x.image_url)el.style.setProperty("--announcement-image","url("+JSON.stringify(x.image_url)+")")});slot.hidden=false}catch(e){slot.hidden=true}}feed.addEventListener("click",async e=>{const close=e.target.closest("[data-dismiss]");if(close){dismissed.add(close.dataset.dismiss);load();return}const copy=e.target.closest("[data-copy-code]");if(copy){const code=copy.parentElement.querySelector("code")?.textContent||"";try{await navigator.clipboard.writeText(code);copy.textContent="کپی شد ✓"}catch{copy.textContent="کپی نشد"}}});load();setInterval(()=>{if(!document.hidden)load()},60000)})();</script>
 </body>
 </html>
