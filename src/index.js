@@ -191,8 +191,9 @@ async function handleTelegramWebhook(request, env) {
       keyboard: [
         [{text:"👤 حساب من"},{text:"💰 کیف پول"}],
         [{text:"📦 پروژه‌های من"},{text:"📨 درخواست‌های من"}],
-        [{text:"📚 کاتالوگ پروژه‌ها"},{text:"🔎 جستجوی کاربر"}],
-        [{text:"⬇️ دانلود پروژه"},{text:"🧾 سفارش‌ها و مزایا"}],
+        [{text:"📚 کاتالوگ پروژه‌ها"},{text:"⭐ ذخیره‌شده‌ها"}],
+        [{text:"🔎 جستجوی کاربر"},{text:"⬇️ دانلود پروژه"}],
+        [{text:"🧾 سفارش‌ها و مزایا"},{text:"🚩 گزارش مشکل"}],
         [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
         [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
         [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
@@ -373,6 +374,63 @@ async function handleTelegramWebhook(request, env) {
         return json({ok:true});
       }
       if (["لغو","انصراف"].includes(userAction) && state) { await clearState(); await telegramSend(env,chatId,"عملیات لغو شد.",menuKeyboard); return json({ok:true}); }
+
+      if (commandName === "/save" || commandName === "/unsave") {
+        const slug = safeText(parts[1] || "",80).toLowerCase();
+        if (!/^[a-z0-9-]{2,80}$/.test(slug)) {
+          await telegramSend(env,chatId,"شناسه پروژه را وارد کن. نمونه: /save my-project",menuKeyboard);
+          return json({ok:true});
+        }
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_projects (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,bot_slug))").run();
+        if (commandName === "/save") {
+          const project = await env.DB.prepare("SELECT slug,title FROM bots WHERE slug=? AND status='published'").bind(slug).first();
+          if (!project) { await telegramSend(env,chatId,"پروژه منتشرشده‌ای با این شناسه پیدا نشد.",menuKeyboard); return json({ok:true}); }
+          const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM saved_projects WHERE user_id=?").bind(linkedAccount.id).first();
+          if (Number(count?.n||0) >= 100) { await telegramSend(env,chatId,"حداکثر ۱۰۰ پروژه می‌توانی ذخیره کنی. ابتدا چند مورد را حذف کن.",menuKeyboard); return json({ok:true}); }
+          await env.DB.prepare("INSERT OR IGNORE INTO saved_projects(user_id,bot_slug) VALUES(?,?)").bind(linkedAccount.id,slug).run();
+          await telegramSend(env,chatId,"⭐ «"+safeText(project.title,100)+"» به فهرست ذخیره‌شده‌ها اضافه شد.",menuKeyboard);
+        } else {
+          await env.DB.prepare("DELETE FROM saved_projects WHERE user_id=? AND bot_slug=?").bind(linkedAccount.id,slug).run();
+          await telegramSend(env,chatId,"پروژه از ذخیره‌شده‌ها حذف شد.",menuKeyboard);
+        }
+        return json({ok:true});
+      }
+      if (commandName === "/favorites" || userAction === "⭐ ذخیره‌شده‌ها") {
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_projects (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,bot_slug))").run();
+        const {results=[]}=await env.DB.prepare("SELECT b.title,b.category,b.slug FROM saved_projects s JOIN bots b ON b.slug=s.bot_slug WHERE s.user_id=? AND b.status='published' ORDER BY s.created_at DESC LIMIT 100").bind(linkedAccount.id).all();
+        await telegramSend(env,chatId,"⭐ پروژه‌های ذخیره‌شده تو\n\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.title,80)+" · "+safeText(x.category,35)+"\nشناسه: "+x.slug+"\nحذف از فهرست: /unsave "+x.slug).join("\n\n")||"هنوز پروژه‌ای ذخیره نکرده‌ای.")+"\n\nبرای ذخیره پروژه: /save شناسه",menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/report" || userAction === "🚩 گزارش مشکل") {
+        const slug = safeText(parts[1] || "",80).toLowerCase();
+        if (commandName === "/report" && !/^[a-z0-9-]{2,80}$/.test(slug)) {
+          await telegramSend(env,chatId,"برای گزارش مشکل، شناسه پروژه را وارد کن. نمونه: /report my-project",menuKeyboard);
+          return json({ok:true});
+        }
+        if (commandName === "/report") {
+          const project = await env.DB.prepare("SELECT slug,title FROM bots WHERE slug=? AND status='published'").bind(slug).first();
+          if (!project) { await telegramSend(env,chatId,"پروژه منتشرشده‌ای با این شناسه پیدا نشد.",menuKeyboard); return json({ok:true}); }
+          await setState("report_project",{slug:project.slug,title:project.title});
+        } else {
+          await setState("report_project");
+        }
+        await telegramSend(env,chatId,"🚩 گزارش مشکل\n\nشناسه پروژه (اگر داری) و توضیح مشکل را بفرست. مثلاً: لینک دانلود کار نمی‌کند.\nبرای انصراف «لغو» را بفرست.",menuKeyboard);
+        return json({ok:true});
+      }
+      if (state === "report_project" && !textValue.startsWith("/")) {
+        const reportText = safeText(userAction,1000);
+        if (reportText.length < 10) { await telegramSend(env,chatId,"لطفاً مشکل را با حداقل ۱۰ کاراکتر توضیح بده."); return json({ok:true}); }
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS project_reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT, category TEXT NOT NULL DEFAULT 'other', message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+        const reportId=id();
+        await env.DB.prepare("INSERT INTO project_reports(id,user_id,bot_slug,category,message) VALUES(?,?,?,'telegram',?)").bind(reportId,linkedAccount.id,statePayload.slug||null,reportText).run();
+        await clearState();
+        const owners=await env.DB.prepare("SELECT id FROM users WHERE role='owner' AND status='active'").all();
+        for (const owner of owners.results||[]) await notify(env,owner.id,"گزارش مشکل جدید 🚩","گزارش تازه از تلگرام ثبت شد. کد پیگیری: "+reportId,"warning");
+        await audit(env,linkedAccount.id,"project.report.telegram","project_report",reportId,{slug:statePayload.slug||null});
+        await telegramSend(env,chatId,"✅ گزارش ثبت شد. کد پیگیری: "+reportId+"\nپس از بررسی، نتیجه از طریق اعلان حساب به تو اطلاع داده می‌شود.",menuKeyboard);
+        return json({ok:true});
+      }
+
       if (commandName === "/catalog" || userAction === "📚 کاتالوگ پروژه‌ها") {
         const {results=[]}=await env.DB.prepare("SELECT title,category,slug,file_size,published_at FROM bots WHERE status='published' ORDER BY CASE WHEN featured_until IS NOT NULL AND featured_until>? THEN 0 ELSE 1 END,featured_until DESC,published_at DESC LIMIT 12").bind(now()).all();
         await telegramSend(env,chatId,"📚 کاتالوگ پروژه‌های BotForge\n\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.title,80)+"\nدسته: "+safeText(x.category,35)+" | حجم: "+Math.ceil(Number(x.file_size||0)/1024)+" KB\nشناسه دانلود: "+x.slug).join("\n\n")||"هنوز پروژه‌ای منتشر نشده است.")+"\n\nبرای دریافت هر پروژه از /download شناسه استفاده کن.",menuKeyboard);
@@ -797,6 +855,63 @@ async function handleApi(request, env, url) {
     return json({ user_id:auth.user.public_id, username:auth.user.username, balance:Number(wallet?.balance||0), lucky:luckyIdReward(auth.user.public_id), claim:claim||null, rewards:rewards.results||[], purchases:purchases.results||[], transactions:transactions.results||[], entitlements:entitlements.results||[], checkin:{claimed_today:checkinRows.some(x=>x.checkin_date===today),streak:Number(checkinRows[0]?.streak||0),last_date:checkinRows[0]?.checkin_date||null,history:checkinRows} });
   }
 
+
+  if (path === "/api/favorites" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_projects (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,bot_slug))").run();
+    const {results=[]}=await env.DB.prepare("SELECT b.id,b.slug,b.title,b.description,b.category,b.original_filename,b.file_size,b.published_at FROM saved_projects s JOIN bots b ON b.slug=s.bot_slug WHERE s.user_id=? AND b.status='published' ORDER BY s.created_at DESC LIMIT 100").bind(auth.user.id).all();
+    return json({items:results});
+  }
+
+  if (path === "/api/favorites" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const body=await request.json().catch(()=>null), slug=safeText(body?.slug,80).toLowerCase();
+    if (!/^[a-z0-9-]{2,80}$/.test(slug)) return json({error:"شناسه پروژه معتبر نیست."},400);
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_projects (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,bot_slug))").run();
+    const project=await env.DB.prepare("SELECT slug FROM bots WHERE slug=? AND status='published'").bind(slug).first();
+    if (!project) return json({error:"پروژه منتشرشده پیدا نشد."},404);
+    const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM saved_projects WHERE user_id=?").bind(auth.user.id).first();
+    const existing=await env.DB.prepare("SELECT 1 AS yes FROM saved_projects WHERE user_id=? AND bot_slug=?").bind(auth.user.id,slug).first();
+    if (!existing && Number(count?.n||0)>=100) return json({error:"حداکثر ۱۰۰ پروژه می‌توانی ذخیره کنی."},409);
+    await env.DB.prepare("INSERT OR IGNORE INTO saved_projects(user_id,bot_slug) VALUES(?,?)").bind(auth.user.id,slug).run();
+    return json({ok:true,saved:true});
+  }
+
+  const favoriteRoute=path.match(/^\/api\/favorites\/([a-z0-9-]+)$/);
+  if (favoriteRoute && method === "DELETE") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth=await requireUser(request,env);
+    if(auth.response)return auth.response;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_projects (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,bot_slug))").run();
+    await env.DB.prepare("DELETE FROM saved_projects WHERE user_id=? AND bot_slug=?").bind(auth.user.id,favoriteRoute[1]).run();
+    return json({ok:true,saved:false});
+  }
+
+  if (path === "/api/reports" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth=await requireUser(request,env);
+    if(auth.response)return auth.response;
+    const body=await request.json().catch(()=>null);
+    const slug=safeText(body?.slug,80).toLowerCase();
+    const category=["download","broken","security","content","other"].includes(body?.category)?body.category:"other";
+    const message=safeText(body?.message,1000);
+    if(message.length<10)return json({error:"توضیح مشکل باید حداقل ۱۰ کاراکتر باشد."},400);
+    if(slug&&!/^[a-z0-9-]{2,80}$/.test(slug))return json({error:"شناسه پروژه معتبر نیست."},400);
+    if(slug){const project=await env.DB.prepare("SELECT slug FROM bots WHERE slug=? AND status='published'").bind(slug).first();if(!project)return json({error:"پروژه منتشرشده پیدا نشد."},404);}
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS project_reports (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, bot_slug TEXT, category TEXT NOT NULL DEFAULT 'other', message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    const recent=await env.DB.prepare("SELECT COUNT(*) AS n FROM project_reports WHERE user_id=? AND created_at>?").bind(auth.user.id,new Date(Date.now()-10*60*1000).toISOString()).first();
+    if(Number(recent?.n||0)>=5)return json({error:"برای جلوگیری از ارسال تکراری، هر ۱۰ دقیقه حداکثر ۵ گزارش می‌توانی ثبت کنی."},429);
+    const reportId=id();
+    await env.DB.prepare("INSERT INTO project_reports(id,user_id,bot_slug,category,message) VALUES(?,?,?,?,?)").bind(reportId,auth.user.id,slug||null,category,message).run();
+    await audit(env,auth.user.id,"project.report.create","project_report",reportId,{slug:slug||null,category});
+    const owners=await env.DB.prepare("SELECT id FROM users WHERE role='owner' AND status='active'").all();
+    for(const owner of owners.results||[]) await notify(env,owner.id,"گزارش مشکل جدید 🚩","گزارش تازه ثبت شد. کد پیگیری: "+reportId,"warning");
+    return json({ok:true,id:reportId,message:"گزارش ثبت شد؛ پس از بررسی نتیجه را در اعلان‌ها می‌بینی."},201);
+  }
+
   if (path === "/api/community/search" && method === "GET") {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
@@ -1108,7 +1223,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"account",description:"اطلاعات حساب"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"account",description:"اطلاعات حساب"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"favorites",description:"پروژه‌های ذخیره‌شده"},{command:"save",description:"ذخیره پروژه"},{command:"unsave",description:"حذف پروژه ذخیره‌شده"},{command:"report",description:"گزارش مشکل پروژه"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
