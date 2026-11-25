@@ -45,6 +45,8 @@
       <article class="stat" data-stat="pending" hidden><span>در صف بررسی</span><strong id="stat-pending">—</strong><small>نیازمند تصمیم مدیر</small></article>
       <article class="stat" data-stat="submissions" hidden><span>کل درخواست‌ها</span><strong id="stat-submissions">—</strong><small>ارسال‌شده توسط اعضا</small></article>
       <article class="stat" data-stat="downloads" hidden><span>دریافت سورس‌ها</span><strong id="stat-downloads">—</strong><small>ثبت‌شده در گزارش فعالیت</small></article>
+      <article class="stat" data-stat="fcoin-balance" hidden><span>موجودی کل F COIN</span><strong id="stat-fcoin-balance">—</strong><small>مجموع اعتبار کیف پول اعضا</small></article>
+      <article class="stat" data-stat="fcoin-wallets" hidden><span>کیف پول‌های فعال</span><strong id="stat-fcoin-wallets">—</strong><small>حساب‌های دارای کیف پول</small></article>
     </section>
 
     <section class="panel workspace-panel" id="submissions-panel" hidden>
@@ -276,6 +278,8 @@
       setStat("pending", overview.pending);
       setStat("submissions", overview.submissions);
       setStat("downloads", overview.downloads);
+      setStat("fcoin-balance", overview.fcoin_balance);
+      setStat("fcoin-wallets", overview.fcoin_wallets);
       $(".workspace-stats").hidden = !$(".stat:not([hidden])", $(".workspace-stats")).length;
       const tasks = [];
       if (permissions.includes("submissions")) tasks.push(loadSubmissions());
