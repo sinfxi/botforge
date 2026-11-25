@@ -10,6 +10,7 @@ const TELEGRAM_USER_MENU_KEYBOARD = {
     [{text:"⬇️ تاریخچه دانلود"},{text:"🚩 گزارش‌های من"}],
     [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
     [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
+    [{text:"🎯 پاداش روزانه"},{text:"📊 خلاصه حساب"}],
     [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
     [{text:"🔗 قطع اتصال تلگرام"}],
     [{text:"❔ راهنما"}]
@@ -237,7 +238,7 @@ async function handleTelegramWebhook(request, env) {
       return json({ok:true});
     }
     if (commandName === "/menu" || commandName === "/account" || userAction === "🏠 منوی اصلی") { await sendHome(); return json({ok:true}); }
-    if (commandName === "/projects" || commandName === "/wallet" || commandName === "/rewards" || commandName === "/gift" || commandName === "/notifications" || commandName === "/support") {
+    if (commandName === "/projects" || commandName === "/wallet" || commandName === "/rewards" || commandName === "/gift" || commandName === "/notifications" || commandName === "/support" || commandName === "/checkin" || commandName === "/status") {
       if (!linkedAccount) { await sendHome(); return json({ok:true}); }
     }
     if (linkedAccount && linkedAccount.status === "active") {
@@ -544,6 +545,48 @@ async function handleTelegramWebhook(request, env) {
         await telegramSend(env,chatId,"👤 حساب کاربری\n\nشناسه: "+linkedAccount.public_id+"\nنام کاربری: @"+linkedAccount.username+"\nوضعیت: فعال\nپروژه‌های منتشرشده: "+Number(projects?.n||0)+"\nدرخواست‌های ثبت‌شده: "+Number(submissions?.n||0)+"\nموجودی: "+Number(wallet?.balance||0).toLocaleString("en-US")+" N Coin",menuKeyboard);
         return json({ok:true});
       }
+      if (commandName === "/checkin" || userAction === "🎯 پاداش روزانه") {
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_daily_checkins (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date TEXT NOT NULL, streak INTEGER NOT NULL, reward INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,checkin_date))").run();
+        const today = new Date().toISOString().slice(0,10);
+        const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+        const last = await env.DB.prepare("SELECT checkin_date,streak FROM ncoin_daily_checkins WHERE user_id=? ORDER BY checkin_date DESC LIMIT 1").bind(linkedAccount.id).first();
+        if (last && last.checkin_date === today) {
+          await telegramSend(env,chatId,"🎯 پاداش امروزت قبلاً ثبت شده.\nرکورد حضور متوالی: "+Number(last.streak||0)+" روز\nفردا دوباره برگرد تا زنجیره حضورت حفظ شود.",menuKeyboard);
+          return json({ok:true});
+        }
+        const streak = last && last.checkin_date === yesterday ? Math.min(365,Number(last.streak||0)+1) : 1;
+        const reward = streak % 7 === 0 ? 200 : 30 + ((streak-1)%7)*10;
+        await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(linkedAccount.id).run();
+        const result = await env.DB.batch([
+          env.DB.prepare("INSERT OR IGNORE INTO ncoin_daily_checkins(user_id,checkin_date,streak,reward) VALUES(?,?,?,?)").bind(linkedAccount.id,today,streak,reward),
+          env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(reward,now(),linkedAccount.id),
+          env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),linkedAccount.id,reward,"daily_checkin","پاداش ورود روزانه از تلگرام · روز "+streak)
+        ]);
+        const inserted=Number(result?.[0]?.meta?.changes ?? result?.[0]?.changes ?? 0);
+        if (!inserted) {
+          await telegramSend(env,chatId,"پاداش امروز قبلاً ثبت شده است.\nبرای دیدن وضعیت حسابت «📊 خلاصه حساب» را بزن.",menuKeyboard);
+          return json({ok:true});
+        }
+        await audit(env,linkedAccount.id,"ncoin.daily_checkin.telegram","wallet",linkedAccount.id,{streak,reward,date:today});
+        const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first();
+        await telegramSend(env,chatId,"🎉 حضور امروز ثبت شد!\n\n+"+reward.toLocaleString("en-US")+" F COIN دریافت کردی.\n🔥 زنجیره حضور: "+streak+" روز\n💰 موجودی جدید: "+Number(wallet?.balance||0).toLocaleString("en-US")+" F COIN\n"+(streak%7===0?"🏆 جایزه هفتگی ویژه را گرفتی!":"تا جایزه ۲۰۰ سکه‌ای روز هفتم ادامه بده."),menuKeyboard);
+        return json({ok:true});
+      }
+      if (commandName === "/status" || userAction === "📊 خلاصه حساب") {
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_daily_checkins (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date TEXT NOT NULL, streak INTEGER NOT NULL, reward INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,checkin_date))").run();
+        const [wallet,projects,submissions,unread,checkin,perks] = await Promise.all([
+          env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT COUNT(*) AS n FROM bots WHERE uploader_id=? AND status='published'").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) AS pending FROM submissions WHERE user_id=?").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id=? AND read_at IS NULL").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT checkin_date,streak FROM ncoin_daily_checkins WHERE user_id=? ORDER BY checkin_date DESC LIMIT 1").bind(linkedAccount.id).first(),
+          env.DB.prepare("SELECT COUNT(*) AS n FROM ncoin_entitlements WHERE user_id=? AND status='active' AND (expires_at IS NULL OR expires_at>?)").bind(linkedAccount.id,now()).first()
+        ]);
+        const today=new Date().toISOString().slice(0,10);
+        const claimed=checkin?.checkin_date===today;
+        await telegramSend(env,chatId,"📊 خلاصه حساب FXI BotForge\n\n👤 شناسه: "+linkedAccount.public_id+"\n📦 پروژه‌های منتشرشده: "+Number(projects?.n||0)+"\n📨 درخواست‌های ثبت‌شده: "+Number(submissions?.total||0)+" (در انتظار: "+Number(submissions?.pending||0)+")\n💰 موجودی: "+Number(wallet?.balance||0).toLocaleString("en-US")+" F COIN\n🎁 مزایای فعال: "+Number(perks?.n||0)+"\n🔔 اعلان‌های خوانده‌نشده: "+Number(unread?.n||0)+"\n🔥 حضور متوالی: "+Number(checkin?.streak||0)+" روز"+(claimed?" · پاداش امروز دریافت شده":" · پاداش امروز باقی است"),menuKeyboard);
+        return json({ok:true});
+      }
       if (commandName === "/wallet" || userAction === "💰 کیف پول") {
         const wallet = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(linkedAccount.id).first();
         const tx = await env.DB.prepare("SELECT amount,description,created_at FROM ncoin_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 5").bind(linkedAccount.id).all();
@@ -609,7 +652,7 @@ async function handleTelegramWebhook(request, env) {
       if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
-        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/status — خلاصه وضعیت حساب\\n/checkin — پاداش حضور روزانه\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
         return json({ok:true});
       } else if (userAction === "🔗 قطع اتصال تلگرام") {
         await setState("confirm_unlink");
@@ -1510,7 +1553,7 @@ async function handleApi(request, env, url) {
       if (!identity?.ok || identity.result?.username?.toLowerCase()!=="fxicode_bot") return json({error:"توکن واردشده متعلق به @FxiCode_bot نیست یا معتبر نیست."},400);
       const hook=await fetch(base+"setWebhook",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook",secret_token:env.TELEGRAM_WEBHOOK_SECRET,allowed_updates:["message"],drop_pending_updates:false})}).then(r=>r.json()).catch(()=>null);
       if(!hook?.ok)return json({error:hook?.description||"ثبت وب‌هوک در تلگرام ناموفق بود."},502);
-      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"inbox",description:"صندوق پیام‌ها (مدیر)"},{command:"thread",description:"گفت‌وگو با کاربر (مدیر)"},{command:"confirm",description:"تأیید یا لغو عملیات (مدیر)"},{command:"user",description:"مدیریت وضعیت کاربر (مدیر)"},{command:"purchase",description:"مدیریت سفارش (مدیر)"},{command:"account",description:"اطلاعات حساب"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"favorites",description:"پروژه‌های ذخیره‌شده"},{command:"save",description:"ذخیره پروژه"},{command:"unsave",description:"حذف پروژه ذخیره‌شده"},{command:"report",description:"گزارش مشکل پروژه"},{command:"myreports",description:"گزارش‌های من"},{command:"trackreport",description:"پیگیری گزارش"},{command:"track",description:"پیگیری درخواست انتشار"},{command:"history",description:"تاریخچه دانلود"},{command:"approve",description:"تأیید درخواست (مدیر)"},{command:"reject",description:"رد درخواست (مدیر)"},{command:"reports",description:"گزارش‌های باز (مدیران)"},{command:"resolve",description:"بستن گزارش (مدیران)"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
+      const commands=await fetch(base+"setMyCommands",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({commands:[{command:"start",description:"شروع ربات"},{command:"connect",description:"اتصال با شناسه سایت"},{command:"menu",description:"منوی حساب کاربری"},{command:"inbox",description:"صندوق پیام‌ها (مدیر)"},{command:"thread",description:"گفت‌وگو با کاربر (مدیر)"},{command:"confirm",description:"تأیید یا لغو عملیات (مدیر)"},{command:"user",description:"مدیریت وضعیت کاربر (مدیر)"},{command:"purchase",description:"مدیریت سفارش (مدیر)"},{command:"account",description:"اطلاعات حساب"},{command:"status",description:"خلاصه وضعیت حساب"},{command:"checkin",description:"دریافت پاداش روزانه"},{command:"catalog",description:"کاتالوگ پروژه‌ها"},{command:"search",description:"جستجوی پروژه‌ها"},{command:"download",description:"دریافت پروژه"},{command:"find",description:"جستجوی شناسه کاربر"},{command:"favorites",description:"پروژه‌های ذخیره‌شده"},{command:"save",description:"ذخیره پروژه"},{command:"unsave",description:"حذف پروژه ذخیره‌شده"},{command:"report",description:"گزارش مشکل پروژه"},{command:"myreports",description:"گزارش‌های من"},{command:"trackreport",description:"پیگیری گزارش"},{command:"track",description:"پیگیری درخواست انتشار"},{command:"history",description:"تاریخچه دانلود"},{command:"approve",description:"تأیید درخواست (مدیر)"},{command:"reject",description:"رد درخواست (مدیر)"},{command:"reports",description:"گزارش‌های باز (مدیران)"},{command:"resolve",description:"بستن گزارش (مدیران)"},{command:"projects",description:"پروژه‌های من"},{command:"submit",description:"ارسال پروژه جدید"},{command:"wallet",description:"کیف پول N Coin"},{command:"rewards",description:"فروشگاه جوایز"},{command:"gift",description:"ثبت کد هدیه"},{command:"notifications",description:"اعلان‌ها"},{command:"support",description:"پشتیبانی"},{command:"help",description:"راهنمای ربات"},{command:"admin",description:"امکانات مدیریتی"}]})}).then(r=>r.json()).catch(()=>null);
       if(!commands?.ok) console.warn("Telegram command menu registration failed:",commands?.description||"unknown");
       await audit(env,admin.user.id,"telegram.webhook.register","telegram_bot","FxiCode_bot",{webhook:"/telegram/webhook",commands:!!commands?.ok});
       return json({ok:true,bot_username:identity.result.username,webhook:"https://botforge.99lq9ohj-kfshcd.workers.dev/telegram/webhook"});
