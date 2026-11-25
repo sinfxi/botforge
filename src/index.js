@@ -706,8 +706,9 @@ export default {
 
     // The public homepage is only a preview. Every workspace page and its data
     // require an authenticated account; redirect guests to registration/login.
-    const user = await currentUser(request, env);
     const protectedPages = new Set(["/dashboard.html", "/admin.html", "/community.html", "/owner-inbox.html"]);
+    const needsUser = protectedPages.has(assetPath) || assetPath === "/index.html" || assetPath === "/app.js";
+    const user = needsUser ? await currentUser(request, env) : null;
     if (protectedPages.has(assetPath) && !user) {
       return Response.redirect(new URL("/login.html?next=" + encodeURIComponent(assetPath), url), 302);
     }
