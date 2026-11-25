@@ -47,6 +47,17 @@ def main():
         raise AssertionError("Worker static allowlist is missing the Cyrus logo/hero image")
     if 'binaryAsset ? "arrayBuffer" : "text"' not in worker_source or '"image/webp"' not in worker_source:
         raise AssertionError("Worker must serve WebP as binary image/webp, not UTF-8 text")
+    public_dir = ROOT / "public"
+    webp_assets = list(public_dir.rglob("*.webp"))
+    if not webp_assets:
+        raise AssertionError("No optimized WebP images found in public assets")
+    legacy_images = [path for path in public_dir.rglob("*") if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".bmp"}]
+    if legacy_images:
+        raise AssertionError("Convert static images to WebP: " + ", ".join(str(path.relative_to(ROOT)) for path in legacy_images))
+    for image_path in webp_assets:
+        image_bytes = image_path.read_bytes()
+        if len(image_bytes) < 16 or image_bytes[:4] != b"RIFF" or image_bytes[8:12] != b"WEBP":
+            raise AssertionError(f"Invalid WebP image: {image_path.relative_to(ROOT)}")
     with tempfile.TemporaryDirectory() as temp:
         for page in PAGES:
             path = ROOT / "public" / page
