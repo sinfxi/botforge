@@ -640,10 +640,12 @@ async function handleTelegramWebhook(request, env) {
     await telegramSend(env,chatId,"🛠 امکانات مدیریتی FXI BotForge\\nشناسه حساب: "+manager.public_id+"\\nفقط گزینه‌های فعال برایت نمایش داده شده‌اند.",menu);
   };
   const label = textValue;
-  if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
+  if (commandName === "/admin" || commandName === "/panel" || label === "🛠 منوی مدیریت" || label === "🏠 منوی مدیریت") { await showMenu(); return json({ok:true}); }
   if (label === "❌ بستن منو") { await telegramSend(env,chatId,"منوی مدیریت بسته شد.",{remove_keyboard:true}); return json({ok:true}); }
+  const managerStateRow = await env.DB.prepare("SELECT state,payload_json FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).first();
   const action = ["📊 آمار کلی","📥 درخواست‌های جدید","👥 کاربران","🔎 جستجوی کاربر","🤖 پروژه‌ها","🛒 سفارش‌های N Coin","🧾 گزارش فعالیت","🚩 گزارش‌های مشکل","🎁 مدیریت هدایا","🌐 پنل مدیریت"].includes(label) ||
-    ["/stats","/pending","/users","/lookup","/projects","/orders","/purchase","/archive","/activity","/reports","/resolve","/approve","/reject","/gifts","/site"].includes(commandName);
+    ["/stats","/pending","/users","/lookup","/user","/projects","/orders","/purchase","/archive","/activity","/reports","/resolve","/approve","/reject","/gifts","/site"].includes(commandName) ||
+    (managerStateRow?.state === "manager_user_lookup" && (/^\\d{4}$/.test(normalizeUserId(label)) || ["لغو","انصراف"].includes(label)));
   if (!action) { await telegramSend(env,chatId,"برای راهنما /help را بزن. با /admin می‌توانی امکانات در دسترس را ببینی."); return json({ok:true}); }
   if (!isManager) { await telegramSend(env,chatId,"⛔ برای این بخش دسترسی فعالی نداری."); return json({ok:true}); }
 
@@ -651,7 +653,6 @@ async function handleTelegramWebhook(request, env) {
 
   // Interactive manager shortcuts. Reply-keyboard buttons send these same commands,
   // so every action still passes the server-side capability and ownership checks.
-  const managerStateRow = await env.DB.prepare("SELECT state,payload_json FROM telegram_bot_states WHERE telegram_user_id=?").bind(String(from.id)).first();
   let managerStatePayload = {};
   try { managerStatePayload = JSON.parse(managerStateRow?.payload_json || "{}"); } catch {}
   const setManagerState = async (state,payload=null) => env.DB.prepare("INSERT INTO telegram_bot_states(telegram_user_id,state,payload_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(telegram_user_id) DO UPDATE SET state=excluded.state,payload_json=excluded.payload_json,updated_at=excluded.updated_at")
