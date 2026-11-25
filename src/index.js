@@ -754,6 +754,30 @@ async function handleApi(request, env, url) {
     return json({ok:true});
   }
 
+  if (path === "/api/community/checkin" && method === "POST") {
+    if (!sameOrigin(request)) return json({error:"درخواست نامعتبر است."},403);
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_daily_checkins (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date TEXT NOT NULL, streak INTEGER NOT NULL, reward INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,checkin_date))").run();
+    const today = new Date().toISOString().slice(0,10);
+    const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+    const last = await env.DB.prepare("SELECT checkin_date,streak FROM ncoin_daily_checkins WHERE user_id=? ORDER BY checkin_date DESC LIMIT 1").bind(auth.user.id).first();
+    if (last && last.checkin_date === today) return json({error:"پاداش امروز را قبلاً دریافت کرده‌ای.",claimed:true},409);
+    const streak = last && last.checkin_date === yesterday ? Math.min(365,Number(last.streak||0)+1) : 1;
+    const reward = streak % 7 === 0 ? 200 : 30 + ((streak-1)%7)*10;
+    await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(auth.user.id).run();
+    const results = await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO ncoin_daily_checkins(user_id,checkin_date,streak,reward) VALUES(?,?,?,?)").bind(auth.user.id,today,streak,reward),
+      env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND changes()=1").bind(reward,now(),auth.user.id),
+      env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) SELECT ?,?,?,?,? WHERE changes()=1").bind(id(),auth.user.id,reward,"daily_checkin","پاداش ورود روزانه · روز "+streak)
+    ]);
+    const inserted=Number(results && results[0] && (results[0].meta?.changes ?? results[0].changes) || 0);
+    if (!inserted) return json({error:"پاداش امروز قبلاً ثبت شده است.",claimed:true},409);
+    await audit(env,auth.user.id,"ncoin.daily_checkin","wallet",auth.user.id,{streak,reward,date:today});
+    await notify(env,auth.user.id,"پاداش روزانه دریافت شد 🎁","روز "+streak+" حضور متوالی؛ "+reward+" F COIN به کیف پولت اضافه شد.","success");
+    const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first();
+    return json({ok:true,streak,reward,balance:Number(wallet && wallet.balance || 0),date:today});
+  }
   if (path === "/api/community/me" && method === "GET") {
     const auth = await requireUser(request, env);
     if (auth.response) return auth.response;
