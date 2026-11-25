@@ -634,13 +634,13 @@ async function handleApi(request, env, url) {
     const body = await request.json().catch(() => null);
     const publicId = normalizeUserId(body?.user_id);
     const password = typeof body?.password === "string" ? body.password : "";
-    if (!/^\d{4}$/.test(publicId) || password.length < 1 || password.length > 200) {
-      return json({ error: "شناسه مالک باید دقیقاً ۴ رقم و رمز عبور باید بین ۱ تا ۲۰۰ کاراکتر باشد." }, 400);
+    const username = safeText(body?.username,24).toLowerCase();
+    if (!/^\d{4}$/.test(publicId) || !/^[a-z0-9_]{3,24}$/.test(username) || password.length < 10 || password.length > 200) {
+      return json({ error: "شناسه باید ۴ رقم، نام کاربری ۳ تا ۲۴ کاراکتر و رمز حداقل ۱۰ کاراکتر باشد." }, 400);
     }
     const requestId = id();
     try {
       const salt = id(), userId = id();
-      const username = "owner_" + publicId;
       const email = username + "@accounts.botforge.invalid";
       const results = await env.DB.batch([
         env.DB.prepare("INSERT INTO users (id,public_id,email,username,password_hash,password_salt,role) SELECT ?,?,?,?,?,?,'owner' WHERE NOT EXISTS (SELECT 1 FROM users WHERE role IN ('owner','admin'))")
@@ -1209,7 +1209,7 @@ async function handleApi(request, env, url) {
       return json({ok:true,status});
     }
 
-    const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : path.includes("/gifts") ? "gifts" : null;
+    const capability = path.includes("/submissions") ? "submissions" : path.includes("/users") ? "users" : path.includes("/bots") ? "bots" : path.includes("/audit") ? "audit" : path.includes("/gifts") ? "gifts" : path.includes("/announcements") ? "announcements" : null;
     if (admin.user.role !== "owner" && capability) {
       const permissions = safePermissions(admin.user.permissions_json);
       if (!permissions.includes(capability)) return json({error:"این دسترسی برای حساب مدیر فعال نیست."},403);
