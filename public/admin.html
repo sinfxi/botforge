@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#183529">
   <meta name="description" content="مرکز مدیریت FXI BotForge">
   <title>مرکز مدیریت | FXI BotForge</title>
-  <link rel="stylesheet" href="/styles.css?v=community-ncoin-20261125">
+  <link rel="stylesheet" href="/styles.css?v=command-center-20261125">
 </head>
 <body class="page-admin">
   <header class="topbar workspace-topbar">
     <a class="brand" href="/" aria-label="FXI BotForge"><span class="brand-mark">F</span><span>FXI <b>BotForge</b></span></a>
     <div class="workspace-nav">
-      <a class="text-link" href="/owner-inbox.html">پیام‌های خصوصی و سفارش‌ها</a><a class="text-link" href="/dashboard.html">فضای شخصی</a>
+      <a class="text-link" href="/community.html">جامعه و N Coin</a><a class="text-link" href="/owner-inbox.html">صندوق پیام‌ها</a><a class="text-link" href="/dashboard.html">فضای شخصی</a>
       <button id="logout" class="quiet-button" type="button">خروج از حساب ↗</button>
     </div>
   </header>
@@ -35,10 +35,10 @@
     <div id="page-message" class="workspace-message" role="status" aria-live="polite">در حال اتصال امن به پنل…</div>
     <div class="workspace-toolbar">
       <div><span class="toolbar-kicker">وضعیت سامانه</span><b>مرکز مدیریت BotForge</b><small>اطلاعات هنگام درخواست یا تازه‌سازی دریافت می‌شوند.</small></div>
-      <div class="toolbar-actions"><button id="admin-refresh" class="quiet-button" type="button">↻ تازه‌سازی اطلاعات</button><button id="admin-export" class="quiet-button" type="button">↓ خروجی CSV</button></div>
+      <div class="toolbar-actions"><span class="live-clock" id="admin-clock">● آنلاین</span><button id="admin-refresh" class="quiet-button" type="button">↻ تازه‌سازی اطلاعات</button><button id="admin-export" class="quiet-button" type="button">↓ خروجی CSV</button></div>
     </div>
 
-    <section class="stats workspace-stats" aria-label="آمار کلی">
+    <section class="admin-launchpad" aria-label="دسترسی سریع"><a href="#submissions-panel"><span>▤</span><b>صف بررسی</b><small>درخواست‌های اعضا</small></a><a href="#users-panel"><span>◎</span><b>مدیریت کاربران</b><small>اعضا و دسترسی‌ها</small></a><a href="#publish-panel"><span>⌘</span><b>انتشار محتوا</b><small>کد، ZIP و فایل</small></a><a href="/owner-inbox.html"><span>✉</span><b>گفت‌وگوی خصوصی</b><small>پیام‌ها و سفارش‌ها</small></a><a href="/community.html"><span>✦</span><b>جامعه و N Coin</b><small>تجربه کاربران</small></a></section>\n\n    <section class="stats workspace-stats" aria-label="آمار کلی">
       <article class="stat" data-stat="users" hidden><span>اعضای ثبت‌نام‌شده</span><strong id="stat-users">—</strong><small>حساب‌های پلتفرم</small></article>
       <article class="stat" data-stat="bots" hidden><span>سورس‌های منتشرشده</span><strong id="stat-bots">—</strong><small>در کتابخانه عمومی</small></article>
       <article class="stat" data-stat="pending" hidden><span>در صف بررسی</span><strong id="stat-pending">—</strong><small>نیازمند تصمیم مدیر</small></article>
