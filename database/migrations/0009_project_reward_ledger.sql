@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS ncoin_project_rewards (
+  submission_id TEXT PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount = 100),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
