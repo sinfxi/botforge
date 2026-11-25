@@ -11,6 +11,7 @@ const TELEGRAM_USER_MENU_KEYBOARD = {
     [{text:"🛍 فروشگاه جوایز"},{text:"🎁 ثبت کد هدیه"}],
     [{text:"🔔 اعلان‌ها"},{text:"💬 پشتیبانی"}],
     [{text:"🎯 پاداش روزانه"},{text:"📊 خلاصه حساب"}],
+    [{text:"🏆 برترین سازندگان"},{text:"📣 اطلاعیه‌ها"}],
     [{text:"📣 اطلاعیه‌ها"},{text:"🛠 مدیریت"}],
     [{text:"🔗 قطع اتصال تلگرام"}],
     [{text:"❔ راهنما"}]
@@ -545,6 +546,11 @@ async function handleTelegramWebhook(request, env) {
         await telegramSend(env,chatId,"👤 حساب کاربری\n\nشناسه: "+linkedAccount.public_id+"\nنام کاربری: @"+linkedAccount.username+"\nوضعیت: فعال\nپروژه‌های منتشرشده: "+Number(projects?.n||0)+"\nدرخواست‌های ثبت‌شده: "+Number(submissions?.n||0)+"\nموجودی: "+Number(wallet?.balance||0).toLocaleString("en-US")+" N Coin",menuKeyboard);
         return json({ok:true});
       }
+      if (commandName === "/top" || userAction === "🏆 برترین سازندگان") {
+        const {results=[]}=await env.DB.prepare("SELECT u.public_id,u.username,w.balance,COUNT(b.id) AS projects FROM ncoin_wallets w JOIN users u ON u.id=w.user_id LEFT JOIN bots b ON b.uploader_id=u.id AND b.status='published' WHERE u.status='active' GROUP BY u.id ORDER BY w.balance DESC,u.created_at ASC LIMIT 10").all();
+        await telegramSend(env,chatId,"🏆 برترین سازندگان BotForge\\n\\n"+(results.map((x,i)=>(i+1)+". "+safeText(x.username,24)+" · "+x.public_id+"\\n   "+Number(x.balance||0).toLocaleString("en-US")+" F COIN · "+Number(x.projects||0)+" پروژه").join("\\n\\n")||"هنوز رتبه‌بندی‌ای وجود ندارد."),menuKeyboard);
+        return json({ok:true});
+      }
       if (commandName === "/checkin" || userAction === "🎯 پاداش روزانه") {
         await env.DB.prepare("CREATE TABLE IF NOT EXISTS ncoin_daily_checkins (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date TEXT NOT NULL, streak INTEGER NOT NULL, reward INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,checkin_date))").run();
         const today = new Date().toISOString().slice(0,10);
@@ -652,7 +658,7 @@ async function handleTelegramWebhook(request, env) {
       if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
-        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/status — خلاصه وضعیت حساب\\n/checkin — پاداش حضور روزانه\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
+        await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/status — خلاصه وضعیت حساب\\n/checkin — پاداش حضور روزانه\\n/top — برترین سازندگان\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
         return json({ok:true});
       } else if (userAction === "🔗 قطع اتصال تلگرام") {
         await setState("confirm_unlink");
@@ -908,9 +914,9 @@ async function handleTelegramWebhook(request, env) {
     await notify(env,submission.user_id,"سورس تو منتشر شد! 🎉","«"+safeText(submission.title,100)+"» پس از بررسی تأیید و در BotForge منتشر شد.","success");
     await audit(env,manager.id,"submission.approve.telegram","submission",submission.id,{slug});
     await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
-    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+50,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
-    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,50,"project_approved","پاداش انتشار پروژه تأییدشده").run();
-    await telegramSend(env,chatId,"🎉 پروژه تأیید و منتشر شد.\nعنوان: "+safeText(submission.title,100)+"\nشناسه انتشار: "+slug+"\nپاداش ۵۰ N Coin برای صاحب پروژه ثبت شد.",menu);
+    await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
+    await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,100,"project_approved","پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده").run();
+    await telegramSend(env,chatId,"🎉 پروژه تأیید و منتشر شد.\nعنوان: "+safeText(submission.title,100)+"\nشناسه انتشار: "+slug+"\nپاداش ۱۰۰ N Coin برای صاحب پروژه ثبت شد.",menu);
     return json({ok:true});
   }
 
@@ -1180,6 +1186,12 @@ async function handleApi(request, env, url) {
     await notify(env,auth.user.id,"پاداش روزانه دریافت شد 🎁","روز "+streak+" حضور متوالی؛ "+reward+" F COIN به کیف پولت اضافه شد.","success");
     const wallet=await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(auth.user.id).first();
     return json({ok:true,streak,reward,balance:Number(wallet && wallet.balance || 0),date:today});
+  }
+  if (path === "/api/community/leaderboard" && method === "GET") {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    const {results=[]}=await env.DB.prepare("SELECT u.public_id,u.username,w.balance,COUNT(b.id) AS projects FROM ncoin_wallets w JOIN users u ON u.id=w.user_id LEFT JOIN bots b ON b.uploader_id=u.id AND b.status='published' WHERE u.status='active' GROUP BY u.id ORDER BY w.balance DESC,u.created_at ASC LIMIT 10").all();
+    return json({items:results.map((x,i)=>({rank:i+1,public_id:x.public_id,username:x.username,balance:Number(x.balance||0),projects:Number(x.projects||0)}))});
   }
   if (path === "/api/community/me" && method === "GET") {
     const auth = await requireUser(request, env);
@@ -1815,8 +1827,8 @@ async function handleApi(request, env, url) {
       await notify(env, submission.user_id, "سورس تو منتشر شد! 🎉", `«${submission.title}» پس از بررسی تأیید و در BotForge منتشر شد.`, "success");
       await audit(env, admin.user.id, "submission.approve", "submission", submission.id, { slug });
       await env.DB.prepare("INSERT OR IGNORE INTO ncoin_wallets(user_id,balance) VALUES(?,0)").bind(submission.user_id).run();
-      await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+50,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
-      await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,50,"project_approved","پاداش انتشار پروژه تأییدشده").run();
+      await env.DB.prepare("UPDATE ncoin_wallets SET balance=balance+100,updated_at=? WHERE user_id=?").bind(now(),submission.user_id).run();
+      await env.DB.prepare("INSERT INTO ncoin_transactions(id,user_id,amount,kind,description) VALUES(?,?,?,?,?)").bind(id(),submission.user_id,100,"project_approved","پاداش ۱۰۰ کوینی انتشار پروژه تأییدشده").run();
       return json({ ok: true, slug });
     }
     if (path === "/api/admin/users" && method === "GET") {
