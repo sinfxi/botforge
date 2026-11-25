@@ -218,8 +218,7 @@ async function handleApi(request, env, url) {
     const user = await env.DB.prepare("SELECT id,public_id,username,role,created_at FROM users WHERE public_id=? AND status='active'").bind(publicId).first();
     if (!user) return json({error:"کاربری با این شناسه پیدا نشد."},404);
     const projects = await env.DB.prepare("SELECT COUNT(*) AS count FROM bots WHERE uploader_id=? AND status='published'").bind(user.id).first();
-    const wallet = await env.DB.prepare("SELECT balance FROM ncoin_wallets WHERE user_id=?").bind(user.id).first();
-    return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0),ncoin:Number(wallet?.balance||0)}});
+    return json({user:{public_id:user.public_id,username:user.username,role:user.role==="user"?"member":user.role,joined_at:user.created_at,projects:Number(projects?.count||0)}});
   }
 
   if (path === "/api/community/lucky/claim" && method === "POST") {
