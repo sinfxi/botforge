@@ -976,3 +976,19 @@ footer{background:rgba(238,246,235,.16)!important;background-image:none!importan
   background:rgba(238,246,235,.72)!important;
  }
 }
+
+
+/* FXI TEXT VISIBILITY PATCH — improve contrast on translucent surfaces */
+body{color:#17271f!important}
+body :is(p,small,label,li,dt,dd,.text-link,.eyebrow,.toolbar-kicker,.muted,.description,.helper-text,.field-hint,.workspace-message,.data-row,.trust-item,.notice,.msg,.warning,.check,.item,.submission,.status,.empty-state,.panel,.stat,.manager-panel,.manager-form,.workspace-panel,.workspace-toolbar,.settings-card,.profile-card,.wallet-card,.gift-card,.history-card,.support-card,.notification-card,.download-card){color:#203329}
+body :is(h1,h2,h3,h4,h5,h6,.brand,.section-title,.panel-title,.card-title,.data-row b,.item b,.submission b,.stat strong,.stat b){color:#14271d}
+body :is(input,textarea,select){color:#18291f!important}
+body :is(input,textarea,select)::placeholder{color:#68786d!important;opacity:1}
+body :is(.button,.button *,button.primary,button.primary *, .hero-shell,.hero-shell *, .workspace-hero,.workspace-hero *, .dash-head,.dash-head *){text-shadow:none}
+body :is(.hero-shell,.workspace-hero,.dash-head) :is(h1,h2,h3,p,small,.eyebrow,.hero-copy,.hero-index,.hero-decoration){color:inherit}
+body :is(.hero-shell,.workspace-hero,.dash-head) h1{color:#f5f7f0!important}
+body :is(.hero-shell,.workspace-hero,.dash-head) p,
+body :is(.hero-shell,.workspace-hero,.dash-head) .hero-copy{color:#e0e9df!important}
+body :is(.hero-shell,.workspace-hero,.dash-head) .eyebrow{color:#c5d9c5!important}
+body :is(.button,.button *,button.primary,button.primary *){color:#fff!important}
+body :is(.quiet-button,.action-button,.action-link,.status-chip,.owner-pill,.count-chip){color:#203329!important}
