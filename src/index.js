@@ -675,8 +675,6 @@ async function handleTelegramWebhook(request, env) {
 
   if (chatType === "group" || chatType === "supergroup") {
     const isSetup = commandName === "/group" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue);
-    const reply = message.reply_to_message;
-    const targetId = reply?.from?.id;
     const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName);
     if (!isSetup && !adminAction && !["قوانین","/rules"].includes(textValue) && !(message.new_chat_members||[]).length) return json({ok:true});
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_group_settings (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, chat_type TEXT NOT NULL, registered_by TEXT NOT NULL, linked_user_id TEXT, rules TEXT, welcome_text TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
