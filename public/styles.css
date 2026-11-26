@@ -546,3 +546,5 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
 
 /* FXI visual refinement */
 :root{--fxi-gold:#d6b36a} .bot-card,.panel,.stat-card{border:1px solid rgba(214,179,106,.24);border-radius:18px;box-shadow:0 8px 24px #0002} .bot-card:hover{border-color:var(--fxi-gold)} button:focus-visible,a:focus-visible{outline:2px solid var(--fxi-gold);outline-offset:3px}
+/* Creator journey */
+.journey{max-width:1120px;margin:36px auto;padding:24px}.journey-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.journey article{padding:22px;border:1px solid #d6b36a55;border-radius:18px;background:#ffffff08}.journey article a{color:#d6b36a}.guest-preview .journey{display:none!important}@media(max-width:650px){.journey-grid{grid-template-columns:1fr}}
