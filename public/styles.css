@@ -771,3 +771,79 @@ body::after{
 @supports not ((backdrop-filter:blur(1px))){
   .home-fold,.bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{background:rgba(248,251,245,.88)!important}
 }
+
+
+/* FXI REAL GLASS OVERRIDE — global surfaces and visible scene */
+html,body{min-height:100%;background:transparent!important}
+body{
+  background-color:#dfe8dc!important;
+  background-image:linear-gradient(180deg,rgba(235,242,231,.18),rgba(235,242,231,.30)),url("/assets/fxi-botforge-3d-bg.webp?v=fxi-3d-20261126")!important;
+  background-position:center center!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+  background-attachment:fixed!important;
+}
+body::before,body::after{display:none!important}
+:root{
+ --fxi-glass:rgba(246,250,243,.43);
+ --fxi-glass-heavy:rgba(246,250,243,.59);
+ --fxi-glass-line:rgba(255,255,255,.62);
+ --fxi-glass-shadow:0 16px 44px rgba(23,48,31,.14),inset 0 1px 0 rgba(255,255,255,.68);
+}
+.topbar,.page-home .topbar,.workspace-topbar,
+.home-fold,.page-home .home-fold,.bot-card,.empty-state,
+.auth-card,.setup .card,.panel,.stat,.manager-panel,.manager-form,
+.workspace-panel,.workspace-stats .stat,.manager-card,.data-row,
+.trust-item,.how-section,.fold-content .trust-item,
+.notice,.msg,.warning,.check,.permission-grid label,
+.item,.submission,.workspace-message,.workspace-toolbar,
+.workspace-identity,.quiet-button,.action-button,.action-link,
+.status-chip,.owner-pill,.count-chip,.steps article,
+.visual-card,.hero-note,.live-metrics,.daily-checkin-card,
+.catalog-tools,.announcement-float,.gift-card,.reward-card,
+.wallet-card,.profile-card,.settings-card,.report-card,
+.support-card,.notification-card,.history-card,.download-card{
+ background:var(--fxi-glass)!important;
+ border:1px solid var(--fxi-glass-line)!important;
+ box-shadow:var(--fxi-glass-shadow)!important;
+ backdrop-filter:blur(20px) saturate(1.35)!important;
+ -webkit-backdrop-filter:blur(20px) saturate(1.35)!important;
+}
+.topbar,.page-home .topbar,.workspace-topbar{background:rgba(246,250,243,.36)!important}
+.home-fold[open],.panel,.workspace-panel,.auth-card,.setup .card,
+.manager-panel,.manager-form,.daily-checkin-card{background:var(--fxi-glass-heavy)!important}
+.page-home .home-fold,.page-home .home-fold[open]{
+ background:rgba(246,250,243,.42)!important;
+ border-color:rgba(255,255,255,.66)!important;
+}
+.home-fold>summary,.page-home .home-fold>summary,
+.data-row,.item,.submission{background:rgba(250,252,247,.24)!important}
+.hero-shell,.workspace-hero,.dash-head{
+ background:linear-gradient(135deg,rgba(24,57,41,.78),rgba(49,83,60,.52))!important;
+ border:1px solid rgba(255,255,255,.34)!important;
+ box-shadow:0 24px 60px rgba(15,36,24,.20),inset 0 1px rgba(255,255,255,.2)!important;
+ backdrop-filter:blur(18px) saturate(1.3)!important;
+ -webkit-backdrop-filter:blur(18px) saturate(1.3)!important;
+}
+.field input,.field textarea,.field select,.catalog-tools input,.catalog-tools select{
+ background:rgba(255,255,255,.48)!important;
+ border:1px solid rgba(255,255,255,.72)!important;
+ backdrop-filter:blur(14px)!important;-webkit-backdrop-filter:blur(14px)!important;
+}
+.bot-meta,.status,.status-chip,.panel-mark,.row-icon,.form-icon,
+.manager-avatar,.identity-avatar,.empty-state>span{
+ background:rgba(226,238,222,.36)!important;
+ border:1px solid rgba(255,255,255,.54)!important;
+}
+footer{background:rgba(246,250,243,.22)!important;backdrop-filter:blur(16px)!important}
+@media(max-width:700px){
+ body{background-attachment:scroll!important;background-position:56% center!important}
+ .topbar,.page-home .topbar,.workspace-topbar,.home-fold,.page-home .home-fold,
+ .bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{
+  backdrop-filter:blur(15px) saturate(1.25)!important;
+  -webkit-backdrop-filter:blur(15px) saturate(1.25)!important;
+ }
+}
+@supports not ((backdrop-filter:blur(1px))){
+ .home-fold,.bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{background:rgba(246,250,243,.86)!important}
+}
