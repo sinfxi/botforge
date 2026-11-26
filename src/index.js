@@ -655,7 +655,7 @@ async function handleTelegramWebhook(request, env) {
         await telegramSend(env,chatId,"📣 اطلاعیه‌های BotForge\n\n"+(results.map(x=>"• "+safeText(x.title,90)+"\n"+safeText(x.body,300)+(x.kind==="gift"&&x.gift_code?"\nکد هدیه: "+x.gift_code+" ("+Number(x.gift_amount||0)+" N Coin)":"")).join("\n\n")||"اطلاعیه فعالی وجود ندارد."),menuKeyboard);
         return json({ok:true});
       }
-      if (userAction === "🛠 مدیریت" || commandName === "/admin" || commandName === "/panel") {
+      if (userAction === "🛠 مدیریت" || userAction === "🛠 منوی مدیریت" || commandName === "/admin" || commandName === "/panel") {
         // Continue to the existing permission-checked manager interface below.
       } else if (userAction === "❔ راهنما" || commandName === "/help") {
         await telegramSend(env,chatId,"راهنمای FXI BotForge\\n/menu — منوی اصلی\\n/account — اطلاعات حساب\\n/status — خلاصه وضعیت حساب\\n/checkin — پاداش حضور روزانه\\n/top — برترین سازندگان\\n/catalog 2 — صفحه دوم کاتالوگ\\n/track UUID — پیگیری درخواست انتشار\\n/myreports — گزارش‌های من\\n/history — تاریخچه دانلود\\n/projects — پروژه‌های منتشرشده تو\\n/wallet — کیف پول N Coin\\n/rewards — فروشگاه جوایز\\n/gift — ثبت کد هدیه\\n/notifications — اعلان‌ها\\n/support — پشتیبانی\\n/submit — ارسال پروژه ZIP\\n/admin — امکانات مدیریتی (در صورت داشتن دسترسی)",menuKeyboard);
