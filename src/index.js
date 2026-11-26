@@ -135,7 +135,7 @@ async function handleTelegramWebhook(request, env) {
   const update = await request.json().catch(() => null);
   const message = update?.message, chatId = message?.chat?.id, chatType = message?.chat?.type || "", from = message?.from;
   const textValue = typeof message?.text === "string" ? message.text.trim() : typeof message?.caption === "string" ? message.caption.trim() : "";
-  if (!chatId || !from || (!textValue && !message?.document)) return json({ok:true});
+  if (!chatId || !from || (!textValue && !message?.document && !(message?.new_chat_members||[]).length)) return json({ok:true});
   const commandToken = (textValue.match(/^\S+/) || [""])[0];
   const argsText = textValue.slice(commandToken.length).trim();
   const parts = [commandToken, (argsText.match(/^\S+/) || [""])[0], argsText];
@@ -673,8 +673,86 @@ async function handleTelegramWebhook(request, env) {
     }
   }
 
+  if (chatType === "group" || chatType === "supergroup") {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_group_settings (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, chat_type TEXT NOT NULL, registered_by TEXT NOT NULL, linked_user_id TEXT, rules TEXT, welcome_text TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    const tgCall = async (method, payload) => {
+      try {
+        const response = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/" + method, {
+          method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload)
+        });
+        return await response.json();
+      } catch (error) { console.error("Telegram group action failed:",method,error); return {ok:false}; }
+    };
+    const actor = await tgCall("getChatMember",{chat_id:chatId,user_id:from.id});
+    const actorStatus = actor?.result?.status;
+    const isGroupAdmin = actor?.ok && ["creator","administrator"].includes(actorStatus);
+    const groupRow = await env.DB.prepare("SELECT chat_id,title,rules,welcome_text,linked_user_id FROM telegram_group_settings WHERE chat_id=?").bind(String(chatId)).first();
+    const isSetup = commandName === "/group" || commandName === "/group@fxicode_bot" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue);
+    if (isSetup) {
+      if (!isGroupAdmin) { await telegramSend(env,chatId,"⛔ فقط مدیران همین گروه می‌توانند مدیریت گروه را فعال کنند."); return json({ok:true}); }
+      const linked = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=? LIMIT 1").bind(String(from.id)).first();
+      await env.DB.prepare("INSERT INTO telegram_group_settings(chat_id,title,chat_type,registered_by,linked_user_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(chat_id) DO UPDATE SET title=excluded.title,chat_type=excluded.chat_type,registered_by=excluded.registered_by,linked_user_id=COALESCE(telegram_group_settings.linked_user_id,excluded.linked_user_id),updated_at=excluded.updated_at")
+        .bind(String(chatId),safeText(message.chat.title||"گروه تلگرام",180),chatType,String(from.id),linked?.user_id||null,now(),now()).run();
+      await telegramSend(env,chatId,"🛡 مدیریت گروه FXI فعال شد.\n\nبرای کارکرد کامل، ربات را مدیر گروه کن و مجوزهای حذف پیام، محدودکردن اعضا و سنجاق پیام را بده.\n\nدستورهای قابل استفاده:\n• «سنجاق» در پاسخ به پیام\n• «حذف» در پاسخ به پیام\n• «سکوت ۱۰» در پاسخ به پیام (دقیقه)\n• «رفع سکوت» در پاسخ به پیام\n• «قوانین» برای نمایش قوانین\n• /setrules متن قوانین\n\nفقط مدیران گروه می‌توانند این عملیات را اجرا کنند.");
+      return json({ok:true});
+    }
+    if (message.new_chat_members?.length && groupRow?.welcome_text) {
+      for (const member of message.new_chat_members.slice(0,10)) {
+        if (!member.is_bot) await telegramSend(env,chatId,groupRow.welcome_text.replace(/\{name\}/g,safeText(member.first_name||"دوست جدید",40)));
+      }
+      return json({ok:true});
+    }
+    const reply = message.reply_to_message;
+    const targetId = reply?.from?.id;
+    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد","قوانین"].includes(textValue) || /^(?:سکوت)(?:\s+\d+)?$/.test(textValue) || commandName === "/pin" || commandName === "/delete" || commandName === "/mute" || commandName === "/unmute" || commandName === "/rules" || commandName === "/setrules";
+    if (adminAction) {
+      if (!isGroupAdmin) { await telegramSend(env,chatId,"⛔ این عملیات فقط برای مدیران گروه فعال است."); return json({ok:true}); }
+      if (!groupRow && commandName !== "/group") {
+        await telegramSend(env,chatId,"ابتدا مدیریت گروه را فعال کن: «مدیریت گروه»");
+        return json({ok:true});
+      }
+      if (["سنجاق","پین"].includes(textValue) || commandName === "/pin") {
+        if (!reply) { await telegramSend(env,chatId,"برای سنجاق‌کردن، دستور «سنجاق» را در پاسخ به پیام موردنظر بفرست."); return json({ok:true}); }
+        const result=await tgCall("pinChatMessage",{chat_id:chatId,message_id:reply.message_id,disable_notification:true});
+        await telegramSend(env,chatId,result.ok?"📌 پیام سنجاق شد.":"نتوانستم پیام را سنجاق کنم؛ دسترسی سنجاق پیام را به ربات بده.");
+        return json({ok:true});
+      }
+      if (["حذف","پاک کن"].includes(textValue) || commandName === "/delete") {
+        if (!reply) { await telegramSend(env,chatId,"برای حذف، «حذف» را در پاسخ به پیام بفرست."); return json({ok:true}); }
+        const result=await tgCall("deleteMessage",{chat_id:chatId,message_id:reply.message_id});
+        await telegramSend(env,chatId,result.ok?"🗑 پیام حذف شد.":"حذف پیام ناموفق بود؛ دسترسی حذف پیام را بررسی کن.");
+        return json({ok:true});
+      }
+      if (/^سکوت(?:\s+\d+)?$/.test(textValue) || commandName === "/mute") {
+        const minutes=Math.max(1,Math.min(1440,Number(commandName==="/mute"?parts[1]:(textValue.match(/\d+/)||[])[0])||10));
+        if (!targetId) { await telegramSend(env,chatId,"برای سکوت‌دادن، «سکوت ۱۰» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
+        if (targetId===from.id || reply?.from?.is_bot) { await telegramSend(env,chatId,"این عضو را نمی‌توانی با این عملیات محدود کنی."); return json({ok:true}); }
+        const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,until_date:Math.floor(Date.now()/1000)+minutes*60,permissions:{can_send_messages:false,can_send_audios:false,can_send_documents:false,can_send_photos:false,can_send_videos:false,can_send_video_notes:false,can_send_voice_notes:false,can_send_polls:false,can_send_other_messages:false,can_add_web_page_previews:false}});
+        await telegramSend(env,chatId,result.ok?"🔇 کاربر به مدت "+minutes+" دقیقه محدود شد.":"محدودسازی انجام نشد؛ ربات باید مدیر و دارای مجوز محدودکردن اعضا باشد.");
+        return json({ok:true});
+      }
+      if (["رفع سکوت","آزاد"].includes(textValue) || commandName === "/unmute") {
+        if (!targetId) { await telegramSend(env,chatId,"برای رفع سکوت، «رفع سکوت» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
+        const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,permissions:{can_send_messages:true,can_send_audios:true,can_send_documents:true,can_send_photos:true,can_send_videos:true,can_send_video_notes:true,can_send_voice_notes:true,can_send_polls:true,can_send_other_messages:true,can_add_web_page_previews:true}});
+        await telegramSend(env,chatId,result.ok?"🔊 محدودیت کاربر برداشته شد.":"رفع محدودیت ناموفق بود؛ دسترسی ربات را بررسی کن.");
+        return json({ok:true});
+      }
+      if (textValue==="قوانین" || commandName==="/rules") {
+        await telegramSend(env,chatId,"📜 قوانین گروه\n\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
+        return json({ok:true});
+      }
+      if (commandName==="/setrules") {
+        const rules=safeText(argsText,3000);
+        if(rules.length<5){await telegramSend(env,chatId,"متن قوانین را بعد از دستور بفرست. نمونه: /setrules احترام به اعضا الزامی است.");return json({ok:true});}
+        await env.DB.prepare("UPDATE telegram_group_settings SET rules=?,updated_at=? WHERE chat_id=?").bind(rules,now(),String(chatId)).run();
+        await telegramSend(env,chatId,"✅ قوانین گروه ذخیره شد.");
+        return json({ok:true});
+      }
+    }
+    return json({ok:true});
+  }
   if (chatType !== "private") {
-    if (commandName === "/admin" || commandName === "/panel") await telegramSend(env, chatId, "🔒 منوی مدیریت فقط در گفت‌وگوی خصوصی ربات فعال است.");
+    if (commandName === "/admin" || commandName === "/panel") await telegramSend(env, chatId, "🔒 منوی مدیریت حساب فقط در گفت‌وگوی خصوصی ربات فعال است.");
     return json({ok:true});
   }
 
