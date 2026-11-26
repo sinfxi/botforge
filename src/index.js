@@ -729,7 +729,7 @@ async function handleTelegramWebhook(request, env) {
         return json({ok:true});
       }
       if (/^سکوت(?:\s+\d+)?$/.test(textValue) || commandName === "/mute") {
-        const minutes=Math.max(1,Math.min(1440,Number(commandName==="/mute"?parts[1]:(textValue.match(/\d+/)||[])[0])||10));
+        const rawMinutes=String(commandName==="/mute"?(parts[1]||""):(textValue.match(/[0-9۰-۹٠-٩]+/)||[])[0]||"10").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));\n        const minutes=Math.max(1,Math.min(1440,Number(rawMinutes)||10));
         if (!targetId) { await telegramSend(env,chatId,"برای سکوت‌دادن، «سکوت ۱۰» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
         if (targetId===from.id || reply?.from?.is_bot) { await telegramSend(env,chatId,"این عضو را نمی‌توانی با این عملیات محدود کنی."); return json({ok:true}); }
         const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,until_date:Math.floor(Date.now()/1000)+minutes*60,permissions:{can_send_messages:false,can_send_audios:false,can_send_documents:false,can_send_photos:false,can_send_videos:false,can_send_video_notes:false,can_send_voice_notes:false,can_send_polls:false,can_send_other_messages:false,can_add_web_page_previews:false}});
