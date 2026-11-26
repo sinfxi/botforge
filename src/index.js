@@ -710,10 +710,6 @@ async function handleTelegramWebhook(request, env) {
       await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
       return json({ok:true});
     }
-    if (textValue==="قوانین" || commandName==="/rules") {
-      await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
-      return json({ok:true});
-    }
     if (adminAction) {
       if (!isGroupAdmin) { await telegramSend(env,chatId,"⛔ این عملیات فقط برای مدیران گروه فعال است."); return json({ok:true}); }
       if (!groupRow && commandName !== "/group") {
@@ -744,10 +740,6 @@ async function handleTelegramWebhook(request, env) {
         if (!targetId) { await telegramSend(env,chatId,"برای رفع سکوت، «رفع سکوت» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
         const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,permissions:{can_send_messages:true,can_send_audios:true,can_send_documents:true,can_send_photos:true,can_send_videos:true,can_send_video_notes:true,can_send_voice_notes:true,can_send_polls:true,can_send_other_messages:true,can_add_web_page_previews:true}});
         await telegramSend(env,chatId,result.ok?"🔊 محدودیت کاربر برداشته شد.":"رفع محدودیت ناموفق بود؛ دسترسی ربات را بررسی کن.");
-        return json({ok:true});
-      }
-      if (textValue==="قوانین" || commandName==="/rules") {
-        await telegramSend(env,chatId,"📜 قوانین گروه\n\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
         return json({ok:true});
       }
       if (commandName==="/setrules") {
