@@ -706,7 +706,10 @@ async function handleTelegramWebhook(request, env) {
     }
     const reply = message.reply_to_message;
     const targetId = reply?.from?.id;
-    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد","قوانین"].includes(textValue) || /^(?:سکوت)(?:\s+\d+)?$/.test(textValue) || commandName === "/pin" || commandName === "/delete" || commandName === "/mute" || commandName === "/unmute" || commandName === "/rules" || commandName === "/setrules";
+    if (textValue==="قوانین" || commandName==="/rules") {
+      await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
+      return json({ok:true});
+    }
     if (textValue==="قوانین" || commandName==="/rules") {
       await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
       return json({ok:true});
