@@ -532,3 +532,15 @@ input::placeholder,textarea::placeholder{color:#526570!important;opacity:1}
 button:disabled{opacity:.65;cursor:not-allowed}
 @media(max-width:768px){.card,.workspace-hero{padding:14px!important}h1,h2,h3,p{overflow-wrap:anywhere}img,svg,video{max-width:100%;height:auto}.workspace-topbar{position:relative!important;flex-wrap:wrap}.workspace-hero{display:block!important}body{overflow-x:clip}}
 @media(forced-colors:active){*{forced-color-adjust:auto}}
+
+/* FXI workspace repair r30 */
+.page-admin,.page-dashboard{--panel-ink:#172b35;--panel-muted:#405765;--panel-line:#d6e2ea;background:#eef3f8!important;color:var(--panel-ink)!important}
+.page-admin .workspace-hero,.page-dashboard .workspace-hero{background:linear-gradient(120deg,#123c50,#244d70 55%,#493b78)!important;color:#fff!important;border:1px solid #47637c!important;padding:28px!important}
+.page-admin .workspace-hero *,.page-dashboard .workspace-hero *{color:#fff!important}
+.page-admin .workspace-hero .workspace-identity,.page-dashboard .workspace-hero .workspace-identity{background:#102d43!important;border:1px solid #7190a7!important;border-radius:14px!important;padding:12px!important}
+.page-admin main,.page-dashboard main{max-width:1440px;margin-inline:auto;padding:24px!important}
+.page-admin .card,.page-dashboard .card,.page-admin .panel,.page-dashboard .panel{background:#fff!important;color:#172b35!important;border:1px solid #d6e2ea!important;box-shadow:0 4px 16px #18374b12!important;border-radius:16px!important}
+.page-admin .card :is(h1,h2,h3,h4,p,label,small),.page-dashboard .card :is(h1,h2,h3,h4,p,label,small){color:#172b35!important;opacity:1!important;visibility:visible!important;overflow-wrap:anywhere}
+.page-admin .workspace-nav,.page-dashboard .workspace-nav{display:flex!important;flex-wrap:wrap!important;gap:10px!important}
+.page-admin .workspace-nav a,.page-dashboard .workspace-nav a{color:#173b55!important;background:#eaf2f8!important;border-radius:10px;padding:10px 14px!important;text-decoration:none!important}
+@media(max-width:768px){.page-admin main,.page-dashboard main{padding:12px!important}.page-admin .workspace-hero,.page-dashboard .workspace-hero{padding:18px!important}.page-admin .workspace-nav,.page-dashboard .workspace-nav{width:100%;overflow-x:auto}.page-admin .workspace-topbar,.page-dashboard .workspace-topbar{height:auto!important;align-items:flex-start!important}}
