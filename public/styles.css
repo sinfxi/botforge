@@ -692,3 +692,82 @@ body::after{
   body::after{background:linear-gradient(180deg,rgba(248,248,243,.82),rgba(248,248,243,.94) 65%,rgba(248,248,243,.9))!important}
 }
 @media(prefers-reduced-motion:reduce){body::before,body::after{animation:none!important}}
+
+
+/* FXI Glass UI — reveal the 3D scene behind every surface */
+html,body{background:transparent!important}
+body::before{
+  opacity:.62!important;
+  filter:saturate(1.12) contrast(1.04)!important;
+  background-position:center center!important;
+}
+body::after{
+  background:linear-gradient(180deg,rgba(237,243,233,.24),rgba(238,242,233,.34) 52%,rgba(238,242,233,.28))!important;
+  opacity:1!important;
+  backdrop-filter:saturate(1.04)!important;
+}
+:root{
+  --fxi-glass-bg:rgba(248,251,245,.56);
+  --fxi-glass-bg-strong:rgba(248,251,245,.68);
+  --fxi-glass-border:rgba(255,255,255,.64);
+  --fxi-glass-shadow:0 18px 48px rgba(20,43,30,.13),inset 0 1px 0 rgba(255,255,255,.72);
+}
+.topbar,.page-home .topbar{
+  background:rgba(247,250,243,.48)!important;
+  border:1px solid rgba(255,255,255,.42)!important;
+  box-shadow:0 10px 34px rgba(20,43,30,.09),inset 0 1px rgba(255,255,255,.62)!important;
+  backdrop-filter:blur(22px) saturate(1.35)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.35)!important;
+}
+.home-fold,.page-home .home-fold,.bot-card,.empty-state,
+.auth-card,.setup .card,.panel,.stat,.manager-panel,.manager-form,
+.workspace-panel,.workspace-stats .stat,.manager-card,.data-row,
+.trust-item,.how-section,.fold-content .trust-item,
+.notice,.msg,.warning,.check,.permission-grid label,
+.item,.submission,.workspace-message,.quiet-button,
+.action-button,.action-link,.status-chip,.owner-pill,.count-chip,
+.steps article,.visual-card,.hero-note,.live-metrics{
+  background:var(--fxi-glass-bg)!important;
+  border:1px solid var(--fxi-glass-border)!important;
+  box-shadow:var(--fxi-glass-shadow)!important;
+  backdrop-filter:blur(18px) saturate(1.28)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(1.28)!important;
+}
+.home-fold[open],.panel,.workspace-panel,.auth-card,.setup .card{
+  background:var(--fxi-glass-bg-strong)!important;
+}
+.home-fold>summary,.data-row,.item,.submission{
+  background:rgba(250,252,247,.38)!important;
+}
+.hero-shell,.workspace-hero,.dash-head{
+  background:linear-gradient(135deg,rgba(29,61,44,.72),rgba(49,83,60,.48))!important;
+  border:1px solid rgba(255,255,255,.25)!important;
+  box-shadow:0 24px 60px rgba(15,36,24,.18),inset 0 1px rgba(255,255,255,.18)!important;
+  backdrop-filter:blur(16px) saturate(1.25)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.25)!important;
+}
+.field input,.field textarea,.field select,
+.catalog-tools input,.catalog-tools select{
+  background:rgba(255,255,255,.58)!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+}
+.bot-meta,.status,.status-chip,.panel-mark,.row-icon,.form-icon,
+.manager-avatar,.identity-avatar,.empty-state>span{
+  background:rgba(229,239,224,.48)!important;
+  border:1px solid rgba(255,255,255,.5)!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+}
+@media(max-width:700px){
+  body::before{opacity:.48!important;background-position:54% center!important}
+  body::after{background:rgba(238,243,233,.32)!important}
+  .home-fold,.bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{
+    backdrop-filter:blur(14px) saturate(1.2)!important;
+    -webkit-backdrop-filter:blur(14px) saturate(1.2)!important;
+  }
+}
+@supports not ((backdrop-filter:blur(1px))){
+  .home-fold,.bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{background:rgba(248,251,245,.88)!important}
+}
