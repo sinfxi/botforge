@@ -674,6 +674,11 @@ async function handleTelegramWebhook(request, env) {
   }
 
   if (chatType === "group" || chatType === "supergroup") {
+    const isSetup = commandName === "/group" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue);
+    const reply = message.reply_to_message;
+    const targetId = reply?.from?.id;
+    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName);
+    if (!isSetup && !adminAction && !["قوانین","/rules"].includes(textValue) && !(message.new_chat_members||[]).length) return json({ok:true});
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_group_settings (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, chat_type TEXT NOT NULL, registered_by TEXT NOT NULL, linked_user_id TEXT, rules TEXT, welcome_text TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const tgCall = async (method, payload) => {
       try {
@@ -683,11 +688,10 @@ async function handleTelegramWebhook(request, env) {
         return await response.json();
       } catch (error) { console.error("Telegram group action failed:",method,error); return {ok:false}; }
     };
-    const actor = await tgCall("getChatMember",{chat_id:chatId,user_id:from.id});
+    const groupRow = await env.DB.prepare("SELECT chat_id,title,rules,welcome_text,linked_user_id FROM telegram_group_settings WHERE chat_id=?").bind(String(chatId)).first();
+    const actor = isSetup || adminAction ? await tgCall("getChatMember",{chat_id:chatId,user_id:from.id}) : null;
     const actorStatus = actor?.result?.status;
     const isGroupAdmin = actor?.ok && ["creator","administrator"].includes(actorStatus);
-    const groupRow = await env.DB.prepare("SELECT chat_id,title,rules,welcome_text,linked_user_id FROM telegram_group_settings WHERE chat_id=?").bind(String(chatId)).first();
-    const isSetup = commandName === "/group" || commandName === "/group@fxicode_bot" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue);
     if (isSetup) {
       if (!isGroupAdmin) { await telegramSend(env,chatId,"⛔ فقط مدیران همین گروه می‌توانند مدیریت گروه را فعال کنند."); return json({ok:true}); }
       const linked = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE telegram_user_id=? LIMIT 1").bind(String(from.id)).first();
@@ -746,6 +750,13 @@ async function handleTelegramWebhook(request, env) {
         if(rules.length<5){await telegramSend(env,chatId,"متن قوانین را بعد از دستور بفرست. نمونه: /setrules احترام به اعضا الزامی است.");return json({ok:true});}
         await env.DB.prepare("UPDATE telegram_group_settings SET rules=?,updated_at=? WHERE chat_id=?").bind(rules,now(),String(chatId)).run();
         await telegramSend(env,chatId,"✅ قوانین گروه ذخیره شد.");
+        return json({ok:true});
+      }
+      if (commandName==="/setwelcome") {
+        const welcome=safeText(argsText,700);
+        if(welcome.length<3){await telegramSend(env,chatId,"متن خوش‌آمدگویی را بعد از دستور بفرست. می‌توانی از {name} برای نام عضو استفاده کنی. نمونه: /setwelcome سلام {name}، خوش اومدی!");return json({ok:true});}
+        await env.DB.prepare("UPDATE telegram_group_settings SET welcome_text=?,updated_at=? WHERE chat_id=?").bind(welcome,now(),String(chatId)).run();
+        await telegramSend(env,chatId,"✅ پیام خوش‌آمدگویی ذخیره شد.");
         return json({ok:true});
       }
     }
