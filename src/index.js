@@ -1941,7 +1941,7 @@ export default {
       catch (error) { const requestId = id(); console.error("API request failed:", requestId, error); return json({ error: "ارتباط با سرویس کامل نشد. وضعیت اتصال را بررسی کن و دوباره تلاش کن.", request_id: requestId }, 500); }
     }
     const assetPath = url.pathname === "/" ? "/index.html" : url.pathname;
-    const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html", "/community.html", "/owner-inbox.html", "/assets/cyrus-hero.webp"]);
+    const allowed = new Set(["/index.html", "/app.js", "/styles.css", "/login.html", "/dashboard.html", "/admin.html", "/setup-owner.html", "/community.html", "/owner-inbox.html", "/assets/cyrus-hero.webp", "/assets/fxi-botforge-3d-bg.webp"]);
     if (!allowed.has(assetPath)) return new Response("Not Found", { status: 404 });
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { allow: "GET, HEAD" } });
 
