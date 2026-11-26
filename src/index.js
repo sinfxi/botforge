@@ -680,7 +680,7 @@ async function handleTelegramWebhook(request, env) {
     const callbackMessageId = Number(callbackParts[2]) || 0;
     const callbackTargetId = Number(callbackParts[3]) || 0;
     const isSetup = commandName === "/group" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue) || callbackAction === "panel";
-    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد","ابزار پیام","مدیریت پیام"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName) || ["panel","pin","delete","mute","unmute"].includes(callbackAction);
+    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد","ابزار پیام","مدیریت پیام"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName) || ["panel","pin","delete","mute","unmute","help","rules_hint","welcome_hint"].includes(callbackAction);
     if (!isSetup && !adminAction && !["قوانین","/rules"].includes(textValue) && callbackAction !== "rules" && !(message.new_chat_members||[]).length) return json({ok:true});
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_group_settings (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, chat_type TEXT NOT NULL, registered_by TEXT NOT NULL, linked_user_id TEXT, rules TEXT, welcome_text TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const tgCall = async (method, payload) => {
