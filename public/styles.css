@@ -507,3 +507,6 @@ body{perspective:1600px}
 .page-admin .workspace-hero,.page-dashboard .workspace-hero{background:linear-gradient(115deg,#edf2eb,#f7f6f1)!important;box-shadow:0 8px 26px rgba(36,54,44,.055)!important;transition:none!important}
 .page-admin .workspace-hero:before,.page-admin .workspace-hero:after,.page-dashboard .workspace-hero:before,.page-dashboard .workspace-hero:after{display:none!important}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* FXI mobile accessibility */
+@media(max-width:768px){body{overflow-x:hidden}main,.workspace,.dashboard,.container{max-width:100%;min-width:0}input,select,textarea{max-width:100%;box-sizing:border-box}button,a{touch-action:manipulation}button{min-height:44px}table{display:block;max-width:100%;overflow-x:auto} .workspace-hero,.card{min-width:0;overflow-wrap:anywhere}nav{flex-wrap:wrap}}
