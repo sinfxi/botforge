@@ -634,3 +634,42 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
  .page-home .fold-content>.live-metrics>div{grid-column:1/-1}
 }
 @media(prefers-reduced-motion:reduce){.page-home .fold-content{animation:none}}
+
+
+/* FXI signature polish — warm, quiet and tactile */
+.page-home .topbar{border-bottom-color:rgba(55,79,59,.09);box-shadow:0 7px 26px rgba(27,48,33,.045)}
+.page-home .brand{letter-spacing:-.45px}
+.page-home .brand-mark{overflow:hidden;background:linear-gradient(145deg,#294c39,#142c20)}
+.page-home .brand-mark img{width:100%;height:100%;object-fit:cover}
+.page-home .hero-shell{position:relative}
+.page-home .hero-shell:after{background:radial-gradient(ellipse at 95% 8%,rgba(230,210,158,.09),transparent 30%),radial-gradient(ellipse at 8% 95%,rgba(157,193,157,.1),transparent 34%)}
+.page-home .hero-copy-wrap{animation:fxi-rise .7s cubic-bezier(.2,.7,.2,1) both}
+.page-home .hero-visual{animation:fxi-rise .85s .08s cubic-bezier(.2,.7,.2,1) both}
+.page-home .hero-note{padding-top:3px}
+.page-home .hero .button{border:1px solid rgba(255,255,255,.45);transition:transform .25s ease,box-shadow .25s ease,filter .25s ease}
+.page-home .hero .button:hover{filter:brightness(1.035);transform:translateY(-3px) scale(1.015)}
+.page-home .home-accordion{position:relative}
+.page-home .home-accordion:before{content:"";position:absolute;right:42px;top:12px;bottom:54px;width:1px;background:linear-gradient(180deg,transparent,#d9dfd1 14%,#d9dfd1 86%,transparent);pointer-events:none;opacity:.7}
+.page-home .home-fold{position:relative;z-index:1;border-color:rgba(62,86,65,.12);background:linear-gradient(120deg,rgba(255,255,252,.97),rgba(244,247,239,.92));backdrop-filter:blur(12px)}
+.page-home .home-fold>summary{position:relative;transition:background .25s ease,padding .25s ease}
+.page-home .home-fold>summary:hover{background:linear-gradient(90deg,rgba(226,235,220,.4),rgba(239,231,209,.23))}
+.page-home .home-fold>summary:focus-visible{outline:3px solid rgba(165,143,91,.55);outline-offset:-4px;border-radius:18px}
+.page-home .home-fold[open]>summary{background:linear-gradient(90deg,rgba(226,235,220,.44),rgba(239,231,209,.25))}
+.page-home .fold-icon{box-shadow:inset 0 1px rgba(255,255,255,.8),0 4px 12px rgba(56,79,56,.07);border:1px solid rgba(128,151,119,.12)}
+.page-home .fold-copy b{font-size:14px;letter-spacing:-.2px}
+.page-home .fold-action i{box-shadow:inset 0 1px rgba(255,255,255,.7);border:1px solid rgba(112,139,105,.13)}
+.page-home .home-fold[open] .fold-content{border-top:1px solid rgba(76,101,72,.08)}
+.page-home .fold-content .trust-item{border-radius:16px;padding:14px 16px;background:rgba(255,255,255,.56);border:1px solid rgba(80,105,77,.08)}
+.page-home .fold-content .live-metrics{border:1px solid rgba(220,203,157,.15)}
+.page-home .fold-content .how-section{background:linear-gradient(135deg,#f0f3e9,#f7f3e8);border:1px solid rgba(130,147,111,.12)}
+.page-home .bot-card{border:1px solid rgba(69,94,68,.11)}
+.page-home .catalog-tools input:focus,.page-home .catalog-tools select:focus{outline:2px solid rgba(122,151,112,.55);outline-offset:2px}
+.page-home footer{border-top:1px solid rgba(45,65,54,.08)}
+@keyframes fxi-rise{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:700px){
+ .page-home .home-accordion:before{right:32px}
+ .page-home .home-fold>summary:hover{background:transparent}
+ .page-home .fold-copy b{font-size:12px}
+ .page-home .fold-action i{width:26px;height:26px}
+}
+@media(prefers-reduced-motion:reduce){.page-home .hero-copy-wrap,.page-home .hero-visual{animation:none}}
