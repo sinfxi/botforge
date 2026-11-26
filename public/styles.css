@@ -495,3 +495,17 @@ body{perspective:1600px}
 .page-home .group-command-list>div:hover{transform:translateY(-3px);box-shadow:0 7px 0 rgba(63,91,63,.055),0 14px 22px rgba(43,63,46,.08)}
 @media(max-width:760px){.page-home .hero-shell{border-radius:25px;transform:none}.page-home .hero-copy-wrap{transform:none}.page-home .visual-card{transform:none!important}.page-home .hero-cyrus-art{transform:none;filter:drop-shadow(0 14px 15px rgba(33,53,39,.16))}.page-home .home-fold:hover,.page-home .trust-item:hover,.page-home .bot-card:hover{transform:translateY(-2px)}}
 @media(prefers-reduced-motion:reduce){.page-home .hero-cyrus-art,.page-home .home-fold,.page-home .trust-item,.page-home .bot-card,.page-home .group-command-list>div,.page-home .button{transition:none!important}.page-home .hero-visual:hover .hero-cyrus-art{transform:none}}
+
+
+/* FXI DIMENSION — signature interactive ray-marched sculpture */
+.hero-visual{isolation:isolate;min-height:470px;display:grid;place-items:center;perspective:1100px}
+.dimension-canvas{display:block;width:min(100%,560px);height:440px;max-height:65vw;min-height:320px;filter:drop-shadow(0 32px 42px rgba(26,54,38,.18));transform:rotateY(-7deg) rotateX(3deg);transition:transform .7s cubic-bezier(.2,.75,.2,1);touch-action:pan-y}
+.hero-visual:hover .dimension-canvas{transform:rotateY(0) rotateX(0) scale(1.025)}
+.dimension-caption{position:absolute;right:5%;bottom:7%;display:flex;align-items:center;gap:9px;padding:11px 15px;border:1px solid rgba(72,103,80,.17);border-radius:14px;background:rgba(249,249,243,.82);box-shadow:0 14px 34px rgba(36,54,44,.09);backdrop-filter:blur(16px);font-size:10px;letter-spacing:.13em;color:#526c59;direction:ltr}
+.dimension-caption small{display:block;position:absolute;top:100%;right:0;margin-top:7px;white-space:nowrap;font-size:8px;letter-spacing:.17em;color:#87958a}
+.dimension-live{width:7px;height:7px;border-radius:50%;background:#82a889;box-shadow:0 0 0 4px rgba(130,168,137,.16);animation:dimensionPulse 2.2s infinite}
+@keyframes dimensionPulse{50%{box-shadow:0 0 0 8px rgba(130,168,137,0)}}
+.dimension-fallback{background:radial-gradient(circle at 50% 45%,#9bb89d 0 4%,#476b55 5% 18%,transparent 19%),radial-gradient(ellipse at 50% 50%,rgba(91,137,100,.22),transparent 65%)}
+@media(max-width:850px){.hero-visual{min-height:350px}.dimension-canvas{height:340px;min-height:280px;max-height:none}.dimension-caption{right:2%;bottom:3%}}
+@media(max-width:520px){.hero-visual{min-height:300px}.dimension-canvas{height:290px;min-height:260px;transform:none}.dimension-caption{font-size:8px;padding:8px 10px}.dimension-caption small{font-size:7px}}
+@media(prefers-reduced-motion:reduce){.dimension-live{animation:none}.dimension-canvas{transition:none}}
