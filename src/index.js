@@ -209,7 +209,7 @@ async function handleTelegramWebhook(request, env) {
     return json({ok:true});
   }
   if (commandName === "/help") {
-    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/status — خلاصه وضعیت حساب\n/checkin — پاداش حضور روزانه\n/top — رتبه‌بندی سازندگان\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/myreports — گزارش‌های ثبت‌شده من\n/track شناسه — پیگیری درخواست انتشار\n/trackreport شناسه — پیگیری گزارش مشکل\n/history — تاریخچه دانلود\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی");
+    await telegramSend(env, chatId, "FXI BotForge 🤖\n/menu — منوی حساب کاربری\n/connect 1234 — درخواست اتصال حساب\n/account — اطلاعات حساب\n/status — خلاصه وضعیت حساب\n/checkin — پاداش حضور روزانه\n/top — رتبه‌بندی سازندگان\n/catalog — کاتالوگ پروژه‌ها\n/search عبارت — جستجوی پروژه\n/download شناسه — دریافت پروژه\n/find 1234 — جستجوی کاربر\n/favorites — پروژه‌های ذخیره‌شده\n/save شناسه — ذخیره پروژه\n/unsave شناسه — حذف از ذخیره‌ها\n/report شناسه — گزارش مشکل پروژه\n/myreports — گزارش‌های ثبت‌شده من\n/track شناسه — پیگیری درخواست انتشار\n/trackreport شناسه — پیگیری گزارش مشکل\n/history — تاریخچه دانلود\n/projects — پروژه‌های من\n/submit — ارسال پروژه ZIP\n/wallet — کیف پول N Coin\n/rewards — فروشگاه جوایز\n/gift — ثبت کد هدیه\n/notifications — اعلان‌ها\n/support — پشتیبانی\n/admin — امکانات مدیریتی در صورت داشتن دسترسی\n/group — فعال‌سازی مدیریت گروه (داخل گروه)\nسنجاق / حذف — در پاسخ به پیام\nسکوت ۱۰ / رفع سکوت — در پاسخ به پیام\nقوانین /setrules متن /setwelcome متن");
     return json({ok:true});
   }
   // Native self-service workspace for linked BotForge accounts.
@@ -738,7 +738,9 @@ async function handleTelegramWebhook(request, env) {
       }
       if (["رفع سکوت","آزاد"].includes(textValue) || commandName === "/unmute") {
         if (!targetId) { await telegramSend(env,chatId,"برای رفع سکوت، «رفع سکوت» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
-        const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,permissions:{can_send_messages:true,can_send_audios:true,can_send_documents:true,can_send_photos:true,can_send_videos:true,can_send_video_notes:true,can_send_voice_notes:true,can_send_polls:true,can_send_other_messages:true,can_add_web_page_previews:true}});
+        const chatInfo=await tgCall("getChat",{chat_id:chatId});
+        const defaultPermissions=chatInfo?.result?.permissions||{can_send_messages:true,can_send_audios:true,can_send_documents:true,can_send_photos:true,can_send_videos:true,can_send_video_notes:true,can_send_voice_notes:true,can_send_polls:true,can_send_other_messages:true,can_add_web_page_previews:true};
+        const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,permissions:defaultPermissions});
         await telegramSend(env,chatId,result.ok?"🔊 محدودیت کاربر برداشته شد.":"رفع محدودیت ناموفق بود؛ دسترسی ربات را بررسی کن.");
         return json({ok:true});
       }
