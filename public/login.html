@@ -125,14 +125,9 @@
         headers: { "content-type": "application/json", "accept": "application/json" },
         body: JSON.stringify(registerMode ? { username: normalizedUsername, password: password.value } : { user_id: userId.value.trim(), username: normalizedUsername, password: password.value })
       };
-      let response;
-      try {
-        response = await fetch(endpoint, requestOptions);
-      } catch (firstError) {
-        // Retry once for a transient connection interruption.
-        await new Promise(resolve => setTimeout(resolve, 500));
-        response = await fetch(endpoint, requestOptions);
-      }
+      // Authentication POSTs are not retried automatically: the server may
+      // have completed registration/login even if the response was interrupted.
+      const response = await fetch(endpoint, requestOptions);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `درخواست ناموفق بود (کد ${response.status}).`);
       if (registerMode) {
