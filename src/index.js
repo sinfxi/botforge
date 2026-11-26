@@ -133,8 +133,9 @@ async function handleTelegramWebhook(request, env) {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_WEBHOOK_SECRET) return json({error:"Telegram integration is not configured."},503);
   if (request.headers.get("x-telegram-bot-api-secret-token") !== env.TELEGRAM_WEBHOOK_SECRET) return json({error:"Unauthorized"},401);
   const update = await request.json().catch(() => null);
-  const message = update?.message, chatId = message?.chat?.id, chatType = message?.chat?.type || "", from = message?.from;
-  const textValue = typeof message?.text === "string" ? message.text.trim() : typeof message?.caption === "string" ? message.caption.trim() : "";
+  const callbackQuery = update?.callback_query || null;
+  const message = update?.message || callbackQuery?.message, chatId = message?.chat?.id, chatType = message?.chat?.type || "", from = update?.message?.from || callbackQuery?.from;
+  const textValue = callbackQuery?.data || (typeof message?.text === "string" ? message.text.trim() : typeof message?.caption === "string" ? message.caption.trim() : "");
   if (!chatId || !from || (!textValue && !message?.document && !(message?.new_chat_members||[]).length)) return json({ok:true});
   const commandToken = (textValue.match(/^\S+/) || [""])[0];
   const argsText = textValue.slice(commandToken.length).trim();
@@ -674,9 +675,13 @@ async function handleTelegramWebhook(request, env) {
   }
 
   if (chatType === "group" || chatType === "supergroup") {
-    const isSetup = commandName === "/group" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue);
-    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName);
-    if (!isSetup && !adminAction && !["قوانین","/rules"].includes(textValue) && !(message.new_chat_members||[]).length) return json({ok:true});
+    const callbackParts = String(callbackQuery?.data || "").split(":");
+    const callbackAction = callbackParts[0] === "fxig" ? callbackParts[1] : "";
+    const callbackMessageId = Number(callbackParts[2]) || 0;
+    const callbackTargetId = Number(callbackParts[3]) || 0;
+    const isSetup = commandName === "/group" || ["مدیریت گروه","پنل گروه","تنظیمات گروه"].includes(textValue) || callbackAction === "panel";
+    const adminAction = ["سنجاق","پین","حذف","پاک کن","رفع سکوت","آزاد","ابزار پیام","مدیریت پیام"].includes(textValue) || /^(?:سکوت)(?:\\s+\\d+)?$/.test(textValue) || ["/pin","/delete","/mute","/unmute","/setrules","/setwelcome"].includes(commandName) || ["panel","pin","delete","mute","unmute"].includes(callbackAction);
+    if (!isSetup && !adminAction && !["قوانین","/rules"].includes(textValue) && callbackAction !== "rules" && !(message.new_chat_members||[]).length) return json({ok:true});
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS telegram_group_settings (chat_id TEXT PRIMARY KEY, title TEXT NOT NULL, chat_type TEXT NOT NULL, registered_by TEXT NOT NULL, linked_user_id TEXT, rules TEXT, welcome_text TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const tgCall = async (method, payload) => {
       try {
@@ -705,9 +710,67 @@ async function handleTelegramWebhook(request, env) {
       return json({ok:true});
     }
     const reply = message.reply_to_message;
-    const targetId = reply?.from?.id;
+    const targetId = callbackAction ? callbackTargetId : reply?.from?.id;
+    if (callbackQuery) {
+      await tgCall("answerCallbackQuery",{callback_query_id:callbackQuery.id});
+      if (callbackAction === "help") {
+        await telegramSend(env,chatId,"🧰 راهنمای سریع گروه\\n۱) روی پیام موردنظر Reply کن و «ابزار پیام» را بفرست.\\n۲) دکمه سنجاق، حذف یا سکوت را انتخاب کن.\\n۳) برای تنظیم قوانین و خوشامدگویی از نمونه‌های زیر کمک بگیر.\\n\\nفقط مدیران واقعی گروه اجازه اجرای عملیات را دارند.");
+        return json({ok:true});
+      }
+      if (callbackAction === "rules_hint") {
+        await telegramSend(env,chatId,"برای ثبت قوانین، متن دلخواهت را بعد از این الگو بفرست:\\n/setrules احترام به اعضا الزامی است.\\n\\nمتن نمونه را با قوانین گروه خودت جایگزین کن.");
+        return json({ok:true});
+      }
+      if (callbackAction === "welcome_hint") {
+        await telegramSend(env,chatId,"برای تنظیم خوشامدگویی، این الگو را بفرست:\\n/setwelcome سلام {name}، به گروه خوش اومدی!\\n\\n{name} با نام عضو جدید جایگزین می‌شود.");
+        return json({ok:true});
+      }
+      if (callbackAction === "pin" || callbackAction === "delete" || callbackAction === "mute" || callbackAction === "unmute") {
+        const actorCheck=await tgCall("getChatMember",{chat_id:chatId,user_id:from.id});
+        if(!actorCheck?.ok || !["creator","administrator"].includes(actorCheck.result?.status)){
+          await telegramSend(env,chatId,"⛔ فقط مدیران گروه می‌توانند این کار را انجام دهند.");return json({ok:true});
+        }
+        if(!groupRow){await telegramSend(env,chatId,"ابتدا مدیریت گروه را با «مدیریت گروه» فعال کن.");return json({ok:true});}
+        if(!callbackMessageId){await telegramSend(env,chatId,"پیام هدف معتبر نیست؛ دوباره ابزار پیام را از روی همان پیام باز کن.");return json({ok:true});}
+        if(callbackAction==="pin"){
+          const result=await tgCall("pinChatMessage",{chat_id:chatId,message_id:callbackMessageId,disable_notification:true});
+          await telegramSend(env,chatId,result.ok?"📌 پیام سنجاق شد.":"سنجاق انجام نشد؛ مجوز سنجاق پیام ربات را بررسی کن.");
+        }else if(callbackAction==="delete"){
+          const result=await tgCall("deleteMessage",{chat_id:chatId,message_id:callbackMessageId});
+          await telegramSend(env,chatId,result.ok?"🗑 پیام حذف شد.":"حذف انجام نشد؛ مجوز حذف پیام ربات را بررسی کن.");
+        }else if(!targetId || targetId===from.id){
+          await telegramSend(env,chatId,"این عضو را نمی‌توان با این عملیات محدود کرد.");
+        }else if(callbackAction==="mute"){
+          const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,until_date:Math.floor(Date.now()/1000)+10*60,permissions:{can_send_messages:false,can_send_audios:false,can_send_documents:false,can_send_photos:false,can_send_videos:false,can_send_video_notes:false,can_send_voice_notes:false,can_send_polls:false,can_send_other_messages:false,can_add_web_page_previews:false}});
+          await telegramSend(env,chatId,result.ok?"🔇 کاربر برای ۱۰ دقیقه محدود شد.":"محدودسازی انجام نشد؛ مجوز محدودکردن اعضا را بررسی کن.");
+        }else{
+          const info=await tgCall("getChat",{chat_id:chatId});
+          const permissions=info?.result?.permissions||{can_send_messages:true,can_send_audios:true,can_send_documents:true,can_send_photos:true,can_send_videos:true,can_send_video_notes:true,can_send_voice_notes:true,can_send_polls:true,can_send_other_messages:true,can_add_web_page_previews:true};
+          const result=await tgCall("restrictChatMember",{chat_id:chatId,user_id:targetId,permissions});
+          await telegramSend(env,chatId,result.ok?"🔊 محدودیت عضو برداشته شد.":"رفع محدودیت انجام نشد؛ دسترسی ربات را بررسی کن.");
+        }
+        return json({ok:true});
+      }
+      if(callbackAction==="rules") {
+        await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است."));
+        return json({ok:true});
+      }
+    }
     if (textValue==="قوانین" || commandName==="/rules") {
       await telegramSend(env,chatId,"📜 قوانین گروه\\n\\n"+(groupRow?.rules||"هنوز قانونی ثبت نشده است. مدیر گروه می‌تواند با /setrules متن قوانین را تنظیم کند."));
+      return json({ok:true});
+    }
+    if (textValue==="ابزار پیام" || textValue==="مدیریت پیام") {
+      if(!isGroupAdmin){await telegramSend(env,chatId,"⛔ این ابزار فقط برای مدیران گروه است.");return json({ok:true});}
+      if(!groupRow){await telegramSend(env,chatId,"ابتدا مدیریت گروه را فعال کن: «مدیریت گروه»");return json({ok:true});}
+      if(!reply){await telegramSend(env,chatId,"برای بازکردن ابزار، روی پیام موردنظر Reply کن و «ابزار پیام» را بفرست.");return json({ok:true});}
+      const messageId=Number(reply.message_id), memberId=Number(reply.from?.id)||0;
+      await telegramSend(env,chatId,"🧰 ابزارهای پیام انتخاب‌شده\\nچه کاری انجام بدهم؟",{
+        inline_keyboard:[
+          [{text:"📌 سنجاق",callback_data:"fxig:pin:"+messageId+":"+memberId},{text:"🗑 حذف",callback_data:"fxig:delete:"+messageId+":"+memberId}],
+          [{text:"🔇 سکوت ۱۰ دقیقه",callback_data:"fxig:mute:"+messageId+":"+memberId},{text:"🔊 رفع سکوت",callback_data:"fxig:unmute:"+messageId+":"+memberId}]
+        ]
+      });
       return json({ok:true});
     }
     if (adminAction) {
