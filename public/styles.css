@@ -458,3 +458,40 @@ body{perspective:1600px}
 /* Defer off-screen sections to reduce initial rendering work. */
 .home-accordion>.home-fold:not([open])>.fold-content{content-visibility:auto;contain-intrinsic-size:1px 420px}
 .live-metrics,.how-section{content-visibility:auto;contain-intrinsic-size:1px 360px}
+
+
+/* FXI BotForge — restrained 3D depth system */
+:root{--fxi-depth:0 24px 55px rgba(33,57,42,.11),0 5px 14px rgba(33,57,42,.06);--fxi-edge:rgba(255,255,255,.78)}
+.page-home{background:radial-gradient(ellipse at 76% 8%,rgba(215,229,211,.8),transparent 32%),radial-gradient(ellipse at 8% 46%,rgba(231,237,222,.55),transparent 27%),#f7f6f1;perspective:1400px}
+.page-home .topbar{border:1px solid rgba(255,255,255,.78);border-top:0;border-radius:0 0 22px 22px;box-shadow:0 12px 30px rgba(37,58,43,.055)}
+.page-home .brand-mark{transform:translateZ(18px);box-shadow:inset 1px 1px 0 rgba(255,255,255,.3),0 8px 0 #1b382b,0 14px 23px rgba(27,56,43,.22)}
+.page-home .hero{perspective:1200px}
+.page-home .hero-shell{isolation:isolate;overflow:hidden;border:1px solid rgba(255,255,255,.82);border-radius:34px;background:linear-gradient(135deg,rgba(255,255,251,.96),rgba(239,244,234,.93));box-shadow:0 34px 75px rgba(34,57,42,.12),0 7px 18px rgba(34,57,42,.06),inset 0 1px 0 white;transform:rotateX(.6deg)}
+.page-home .hero-shell:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 75% 42%,rgba(172,199,168,.28),transparent 40%),linear-gradient(120deg,transparent 35%,rgba(255,255,255,.42) 50%,transparent 66%);}
+.page-home .hero-copy-wrap{transform:translateZ(28px)}
+.page-home .hero-visual{transform-style:preserve-3d;perspective:900px}
+.page-home .hero-cyrus-art{filter:drop-shadow(0 24px 22px rgba(33,53,39,.2));transform:rotateY(-7deg) rotateX(3deg) translateZ(24px);transition:transform .55s cubic-bezier(.2,.75,.25,1),filter .55s}
+.page-home .hero-visual:hover .hero-cyrus-art{transform:rotateY(-2deg) rotateX(0) translateY(-7px) translateZ(42px);filter:drop-shadow(0 34px 28px rgba(33,53,39,.24))}
+.page-home .visual-card{border:1px solid rgba(255,255,255,.88);background:rgba(255,255,250,.82);box-shadow:0 17px 32px rgba(32,53,39,.13),inset 0 1px 0 white;backdrop-filter:blur(16px);transform:translateZ(52px)}
+.page-home .visual-card.card-top{transform:translateZ(58px) rotateY(-5deg)}
+.page-home .visual-card.card-bottom{transform:translateZ(44px) rotateY(4deg)}
+.page-home .button{position:relative;transform:translateY(0) translateZ(0);border:1px solid rgba(255,255,255,.2);box-shadow:0 6px 0 #1e3e2d,0 13px 25px rgba(36,74,51,.2),inset 0 1px 0 rgba(255,255,255,.2);transition:transform .22s ease,box-shadow .22s ease,filter .22s ease}
+.page-home .button:hover{transform:translateY(-3px) translateZ(5px);box-shadow:0 9px 0 #1e3e2d,0 20px 32px rgba(36,74,51,.23),inset 0 1px 0 rgba(255,255,255,.25);filter:saturate(1.08)}
+.page-home .button:active{transform:translateY(3px);box-shadow:0 2px 0 #1e3e2d,0 6px 12px rgba(36,74,51,.14)}
+.page-home .home-fold{border:1px solid rgba(255,255,255,.92);border-radius:23px;background:linear-gradient(145deg,#fffefa,#f2f5ed);box-shadow:0 13px 28px rgba(37,57,42,.065),inset 0 1px 0 white;transition:transform .28s ease,box-shadow .28s ease,border-color .28s ease}
+.page-home .home-fold:hover{transform:translateY(-3px);box-shadow:0 20px 38px rgba(37,57,42,.095),inset 0 1px 0 white;border-color:#dce8d8}
+.page-home .home-fold[open]{box-shadow:0 20px 42px rgba(37,57,42,.085),inset 0 1px 0 white}
+.page-home .home-fold>summary{position:relative}
+.page-home .fold-icon,.page-home .trust-icon{box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 5px 0 rgba(63,94,67,.09),0 10px 18px rgba(45,70,49,.08)}
+.page-home .trust-item{border:1px solid rgba(255,255,255,.88);border-radius:19px;background:linear-gradient(145deg,#fffefa,#f1f5ed);box-shadow:0 12px 24px rgba(40,61,44,.065),inset 0 1px 0 white;transition:transform .25s ease,box-shadow .25s ease}
+.page-home .trust-item:hover{transform:translateY(-5px) rotateX(2deg);box-shadow:0 21px 34px rgba(40,61,44,.11),inset 0 1px 0 white}
+.page-home .bot-card{position:relative;isolation:isolate;border:1px solid rgba(255,255,255,.95);background:linear-gradient(150deg,#fffefa 0%,#f5f8f1 100%);box-shadow:0 5px 0 #e5ebdf,0 13px 25px rgba(43,63,46,.075),inset 0 1px 0 white;transition:transform .3s cubic-bezier(.2,.75,.25,1),box-shadow .3s,border-color .3s}
+.page-home .bot-card:before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,.58),transparent 48%)}
+.page-home .bot-card:hover{transform:translateY(-7px) rotateX(1.2deg);border-color:#cbdcc8;box-shadow:0 8px 0 #dce7d8,0 24px 38px rgba(43,63,46,.13),inset 0 1px 0 white}
+.page-home .category-chip,.page-home .catalog-tools-pro>select,.page-home .catalog-search-wrap input,.page-home .saved-filter{box-shadow:0 4px 0 rgba(45,70,49,.045),0 8px 18px rgba(43,65,48,.035);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.page-home .category-chip:hover{transform:translateY(-2px);box-shadow:0 5px 0 rgba(45,70,49,.06),0 11px 18px rgba(43,65,48,.07)}
+.page-home .group-feature-panel{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.9);background:linear-gradient(145deg,#f8faf4,#eaf1e6);box-shadow:0 17px 35px rgba(37,59,42,.08),inset 0 1px 0 white}
+.page-home .group-command-list>div{border:1px solid rgba(255,255,255,.95);background:linear-gradient(145deg,#fffefa,#f2f6ee);box-shadow:0 5px 0 rgba(63,91,63,.055),0 9px 17px rgba(43,63,46,.045);transition:transform .2s ease,box-shadow .2s ease}
+.page-home .group-command-list>div:hover{transform:translateY(-3px);box-shadow:0 7px 0 rgba(63,91,63,.055),0 14px 22px rgba(43,63,46,.08)}
+@media(max-width:760px){.page-home .hero-shell{border-radius:25px;transform:none}.page-home .hero-copy-wrap{transform:none}.page-home .visual-card{transform:none!important}.page-home .hero-cyrus-art{transform:none;filter:drop-shadow(0 14px 15px rgba(33,53,39,.16))}.page-home .home-fold:hover,.page-home .trust-item:hover,.page-home .bot-card:hover{transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.page-home .hero-cyrus-art,.page-home .home-fold,.page-home .trust-item,.page-home .bot-card,.page-home .group-command-list>div,.page-home .button{transition:none!important}.page-home .hero-visual:hover .hero-cyrus-art{transform:none}}
