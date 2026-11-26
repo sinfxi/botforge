@@ -45,7 +45,7 @@ list?.addEventListener("click", async event => {
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"ذخیره پروژه انجام نشد.");
    if(wasSaved)savedSlugs.delete(slug);else savedSlugs.add(slug);
-   favorite.textContent=wasSaved?"☆ ذخیره پروژه":"★ ذخیره‌شده";
+   renderBots();
   }catch(error){alert(error.message)}finally{favorite.disabled=false}
   return;
  }
