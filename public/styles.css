@@ -510,3 +510,11 @@ body{perspective:1600px}
 
 /* FXI mobile accessibility */
 @media(max-width:768px){body{overflow-x:hidden}main,.workspace,.dashboard,.container{max-width:100%;min-width:0}input,select,textarea{max-width:100%;box-sizing:border-box}button,a{touch-action:manipulation}button{min-height:44px}table{display:block;max-width:100%;overflow-x:auto} .workspace-hero,.card{min-width:0;overflow-wrap:anywhere}nav{flex-wrap:wrap}}
+
+/* FXI Aurora design system */
+:root{--fxi-ink:#172b2b;--fxi-teal:#087f79;--fxi-violet:#7053b8;--fxi-gold:#d99a36;--fxi-surface:#fff;--fxi-bg:#f3f6fa}
+body{background:radial-gradient(ellipse at 95% 0%,#e4f5ef,transparent 42%),radial-gradient(ellipse at 0% 15%,#eee9fa,transparent 38%),#f3f6fa!important;color:var(--fxi-ink)}
+.workspace-hero{background:linear-gradient(125deg,#075d60,#176c82 52%,#624e9b)!important;color:white!important;border:1px solid #ffffff40!important;border-radius:24px!important;box-shadow:0 12px 30px #17495a20!important}
+.card{border:1px solid #dce5ed!important;border-radius:18px!important;box-shadow:0 5px 18px #223d5610!important;background:#ffffffed!important}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #d18c31!important;outline-offset:3px}
+@media(max-width:600px){.workspace-hero{border-radius:16px!important;padding:16px!important}.card{border-radius:14px!important}h1{font-size:clamp(1.35rem,5vw,2rem)}nav a{min-height:44px;display:inline-flex;align-items:center}body{background:#f3f6fa!important}}
