@@ -8,7 +8,7 @@
   <title>FXI BotForge — خانه سازندگان</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/styles.css?v=fxi-folds-20261126-r12">
+  <link rel="stylesheet" href="/styles.css?v=fxi-aesthetic-20261126-r13">
   <style>
 .guest-preview .topbar nav,.guest-preview footer,.guest-preview .hero-actions .text-link{display:none!important}
 .guest-preview .hero{min-height:0;display:flex;align-items:center}
@@ -81,6 +81,21 @@
     </section></div>
       </details>
     </section>
+  <script>
+  // Open the relevant accordion panel when a navigation link points to content inside it.
+  document.addEventListener("click",function(event){
+    const link=event.target.closest('a[href^="#"]');
+    if(!link)return;
+    const target=document.querySelector(link.getAttribute("href"));
+    const fold=target?.closest(".home-fold");
+    if(fold){fold.open=true;document.querySelectorAll(".home-fold").forEach(item=>{if(item!==fold)item.open=false;});}
+  });
+  document.querySelectorAll(".home-fold").forEach(fold=>{
+    fold.addEventListener("toggle",()=>{
+      if(fold.open)document.querySelectorAll(".home-fold").forEach(other=>{if(other!==fold)other.open=false;});
+    });
+  });
+  </script>
   <section class="announcement-slot" id="announcement-slot" aria-label="اطلاع‌رسانی عمومی" hidden><div id="announcement-feed" class="announcement-feed"></div></section>
 </main>
   <footer><a class="brand" href="/"><span class="brand-mark"><img src="/assets/cyrus-hero.webp?v=fxi-polish-20261125-r2" alt="" width="46" height="46" decoding="async"></span><span>FXI <b>BotForge</b></span></a><span>ساخته‌شده برای کسانی که دوست دارند چیزهای تازه بسازند.</span></footer>
