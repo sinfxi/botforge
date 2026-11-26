@@ -728,7 +728,7 @@ async function handleTelegramWebhook(request, env) {
         await telegramSend(env,chatId,result.ok?"🗑 پیام حذف شد.":"حذف پیام ناموفق بود؛ دسترسی حذف پیام را بررسی کن.");
         return json({ok:true});
       }
-      if (/^سکوت(?:\s+\d+)?$/.test(textValue) || commandName === "/mute") {
+      if (/^سکوت(?:\s+[0-9۰-۹٠-٩]+)?$/.test(textValue) || commandName === "/mute") {
         const rawMinutes=String(commandName==="/mute"?(parts[1]||""):(textValue.match(/[0-9۰-۹٠-٩]+/)||[])[0]||"10").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));\n        const minutes=Math.max(1,Math.min(1440,Number(rawMinutes)||10));
         if (!targetId) { await telegramSend(env,chatId,"برای سکوت‌دادن، «سکوت ۱۰» را در پاسخ به پیام کاربر بفرست."); return json({ok:true}); }
         if (targetId===from.id || reply?.from?.is_bot) { await telegramSend(env,chatId,"این عضو را نمی‌توانی با این عملیات محدود کنی."); return json({ok:true}); }
