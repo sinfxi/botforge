@@ -673,3 +673,22 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
  .page-home .fold-action i{width:26px;height:26px}
 }
 @media(prefers-reduced-motion:reduce){.page-home .hero-copy-wrap,.page-home .hero-visual{animation:none}}
+
+
+/* FXI BotForge cinematic 3D background */
+body::before{
+  inset:0!important;width:100%!important;height:100%!important;border-radius:0!important;
+  background-image:url("/assets/fxi-botforge-3d-bg.webp?v=fxi-3d-20261126")!important;
+  background-position:center center!important;background-size:cover!important;background-repeat:no-repeat!important;
+  opacity:.16!important;filter:saturate(.9)!important;animation:none!important;
+}
+body::after{
+  inset:0!important;width:100%!important;height:100%!important;border-radius:0!important;
+  background:linear-gradient(180deg,rgba(248,248,243,.76),rgba(248,248,243,.9) 58%,rgba(248,248,243,.82))!important;
+  opacity:1!important;filter:none!important;animation:none!important;
+}
+@media(max-width:700px){
+  body::before{background-position:54% center!important;opacity:.12!important}
+  body::after{background:linear-gradient(180deg,rgba(248,248,243,.82),rgba(248,248,243,.94) 65%,rgba(248,248,243,.9))!important}
+}
+@media(prefers-reduced-motion:reduce){body::before,body::after{animation:none!important}}
