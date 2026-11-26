@@ -543,3 +543,6 @@ body::before,body::after{animation:none!important;filter:none;opacity:.28}
 
 /* Creator leaderboard */
 .creator-leaderboard{margin:22px 0}.leaderboard-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.leaderboard-heading h2{margin:5px 0}.creator-leaderboard-list{display:grid;gap:9px}.creator-rank{display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #e9eee6;border-radius:16px;background:linear-gradient(110deg,#fffefa,#f6f8f2)}.creator-rank-number{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#e8efe5;color:#31533d;font-weight:800}.creator-rank-user{display:grid;gap:3px;flex:1;min-width:0}.creator-rank-user small{color:#758174;font-size:12px}.creator-rank>strong{font-size:13px;color:#496d4e;white-space:nowrap}@media(max-width:560px){.leaderboard-heading{align-items:flex-start}.creator-rank{gap:9px;padding:11px}.creator-rank>strong{font-size:11px}}
+
+/* FXI visual refinement */
+:root{--fxi-gold:#d6b36a} .bot-card,.panel,.stat-card{border:1px solid rgba(214,179,106,.24);border-radius:18px;box-shadow:0 8px 24px #0002} .bot-card:hover{border-color:var(--fxi-gold)} button:focus-visible,a:focus-visible{outline:2px solid var(--fxi-gold);outline-offset:3px}
