@@ -847,3 +847,59 @@ footer{background:rgba(246,250,243,.22)!important;backdrop-filter:blur(16px)!imp
 @supports not ((backdrop-filter:blur(1px))){
  .home-fold,.bot-card,.panel,.stat,.workspace-panel,.auth-card,.setup .card{background:rgba(246,250,243,.86)!important}
 }
+
+
+/* FXI PHOTO BACKDROP — image on the page AND on the glass panels */
+body{
+ background-image:
+  linear-gradient(180deg,rgba(235,242,231,.24),rgba(235,242,231,.34)),
+  url("/assets/fxi-botforge-3d-bg.webp?v=fxi-photo-panels-20261126")!important;
+ background-size:cover,cover!important;
+ background-position:center center,center center!important;
+ background-repeat:no-repeat,no-repeat!important;
+ background-attachment:fixed,fixed!important;
+}
+body::before,body::after{display:none!important}
+.topbar,.page-home .topbar,.workspace-topbar,
+.home-fold,.page-home .home-fold,.bot-card,.empty-state,
+.auth-card,.setup .card,.panel,.stat,.manager-panel,.manager-form,
+.workspace-panel,.workspace-stats .stat,.manager-card,.data-row,
+.trust-item,.how-section,.fold-content .trust-item,
+.notice,.msg,.warning,.check,.permission-grid label,
+.item,.submission,.workspace-message,.workspace-toolbar,
+.workspace-identity,.quiet-button,.action-button,.action-link,
+.status-chip,.owner-pill,.count-chip,.steps article,
+.visual-card,.hero-note,.live-metrics,.daily-checkin-card,
+.catalog-tools,.announcement-float,.gift-card,.reward-card,
+.wallet-card,.profile-card,.settings-card,.report-card,
+.support-card,.notification-card,.history-card,.download-card{
+ background-image:
+  linear-gradient(135deg,rgba(246,250,243,.60),rgba(246,250,243,.43)),
+  url("/assets/fxi-botforge-3d-bg.webp?v=fxi-photo-panels-20261126")!important;
+ background-size:cover,cover!important;
+ background-position:center,center!important;
+ background-repeat:no-repeat,no-repeat!important;
+ background-attachment:scroll,scroll!important;
+ background-blend-mode:normal,normal!important;
+ border:1px solid rgba(255,255,255,.68)!important;
+ box-shadow:0 16px 44px rgba(23,48,31,.16),inset 0 1px 0 rgba(255,255,255,.72)!important;
+ backdrop-filter:blur(16px) saturate(1.25)!important;
+ -webkit-backdrop-filter:blur(16px) saturate(1.25)!important;
+}
+.hero-shell,.workspace-hero,.dash-head{
+ background-image:
+  linear-gradient(135deg,rgba(24,57,41,.72),rgba(49,83,60,.48)),
+  url("/assets/fxi-botforge-3d-bg.webp?v=fxi-photo-panels-20261126")!important;
+ background-size:cover,cover!important;
+ background-position:center,center!important;
+}
+@media(max-width:700px){
+ body{background-attachment:scroll,scroll!important;background-position:center,56% center!important}
+ .topbar,.page-home .topbar,.workspace-topbar,
+ .home-fold,.page-home .home-fold,.bot-card,.panel,.stat,
+ .workspace-panel,.auth-card,.setup .card{
+  background-image:
+   linear-gradient(135deg,rgba(246,250,243,.68),rgba(246,250,243,.54)),
+   url("/assets/fxi-botforge-3d-bg.webp?v=fxi-photo-panels-20261126")!important;
+ }
+}
