@@ -69,3 +69,68 @@ window.addEventListener("online",()=>{loadCatalog();loadPublicStats();});window.
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadCatalog({quiet:true});loadPublicStats();}});
 loadCatalog();loadPublicStats();setInterval(()=>{if(!document.hidden){loadCatalog({quiet:true});loadPublicStats();}},30000);
 fetch("/api/me",{credentials:"same-origin",cache:"no-store"}).then(r=>r.ok?r.json():null).then(async data=>{if(!data?.user)return;loggedIn=true;const savedFilter=document.querySelector("#saved-filter");if(savedFilter)savedFilter.hidden=false;try{const fav=await fetchJson("/api/favorites",{credentials:"same-origin",cache:"no-store"});savedSlugs=new Set((fav.items||[]).map(x=>x.slug));renderBots();}catch{}document.body.classList.remove("guest-preview");const heroLink=document.querySelector('.hero-actions a[href="/login.html"]');if(heroLink){heroLink.href="#explore";heroLink.innerHTML="ورود به کتابخانه <span>←</span>";}const heroSecondary=document.querySelector(".hero-actions .text-link");if(heroSecondary){heroSecondary.href="/dashboard.html";heroSecondary.textContent="پروژه‌ات را منتشر کن ↗";}const loginLink=document.querySelector(".topbar > .button");if(loginLink){loginLink.href="/dashboard.html";loginLink.textContent="فضای شخصی ↗";}const dashboardLink=document.querySelector('.hero-actions a[href="/dashboard.html"]');if(dashboardLink)dashboardLink.textContent="رفتن به فضای شخصی ↗";if(["admin","owner"].includes(data.user.role)){const nav=document.querySelector(".topbar nav");if(nav&&!document.querySelector("[data-admin-nav]")){const link=document.createElement("a");link.href="/admin.html";link.dataset.adminNav="true";link.textContent="مرکز مدیریت";nav.append(link);}}}).catch(()=>{});
+
+
+// FXI DIMENSION — original realtime ray-marched object (no image or 3D library).
+(()=>{
+ const canvas=document.getElementById("fxi-dimension");
+ if(!canvas)return;
+ const gl=canvas.getContext("webgl",{alpha:true,antialias:true,powerPreference:"low-power"});
+ if(!gl){canvas.classList.add("dimension-fallback");return;}
+ const vertex=`attribute vec2 p; void main(){gl_Position=vec4(p,0.,1.);}`;
+ const fragment=`precision highp float;
+ uniform vec2 r; uniform float t; uniform vec2 m;
+ mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
+ float sdTorus(vec3 p,vec2 q){return length(vec2(length(p.xz)-q.x,p.y))-q.y;}
+ float scene(vec3 p){
+  vec3 q=p;
+  q.xz=rot(.42*sin(t*.22)+m.x*.32)*q.xz;
+  q.xy=rot(.58+m.y*.22)*q.xy;
+  float a=sdTorus(q,vec2(.77,.105));
+  vec3 b=p;b.yz=rot(1.04+t*.13)*b.yz;b.xy=rot(-.66)*b.xy;
+  float c=sdTorus(b,vec2(.77,.075));
+  vec3 d=p;d.xz=rot(1.57-t*.11)*d.xz;d.yz=rot(.42)*d.yz;
+  float e=sdTorus(d,vec2(.77,.052));
+  float core=length(p)-.37;
+  float rings=min(a,min(c,e));
+  return min(rings,core);
+ }
+ vec3 normalAt(vec3 p){vec2 e=vec2(.001,0.);return normalize(vec3(scene(p+e.xyy)-scene(p-e.xyy),scene(p+e.yxy)-scene(p-e.yxy),scene(p+e.yyx)-scene(p-e.yyx)));}
+ void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*r)/r.y;
+  vec3 ro=vec3(0.,0.,3.35),rd=normalize(vec3(uv,-1.85));
+  float travel=0.,dist=0.;vec3 pos;
+  for(int i=0;i<100;i++){pos=ro+rd*travel;dist=scene(pos);if(dist<.0015||travel>8.)break;travel+=dist*.82;}
+  vec3 col=vec3(.025,.055,.043);
+  if(travel<8.){
+   vec3 n=normalAt(pos),light=normalize(vec3(-.55,.8,1.2)),view=normalize(ro-pos);
+   float diff=max(dot(n,light),0.);
+   float rim=pow(1.-max(dot(n,view),0.),2.4);
+   float spec=pow(max(dot(reflect(-light,n),view),0.),42.);
+   float bands=.5+.5*sin(atan(pos.z,pos.x)*7.+pos.y*8.);
+   vec3 deep=vec3(.10,.25,.18),mint=vec3(.58,.82,.64),gold=vec3(.62,.48,.25);
+   vec3 mat=mix(deep,mint,smoothstep(.15,.95,bands));
+   mat=mix(mat,gold,smoothstep(.93,1.,bands)*.35);
+   col=mat*(.22+diff*.8)+vec3(.55,.82,.63)*rim*.55+vec3(1.,.86,.58)*spec*.8;
+   float fog=exp(-travel*.18);col=mix(vec3(.025,.055,.043),col,fog);
+  }
+  float vignette=1.-smoothstep(.35,1.25,length(uv));col*=.68+.32*vignette;
+  gl_FragColor=vec4(col,1.);
+ }`;
+ const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
+ try{
+  const program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);
+  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+  gl.useProgram(program);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(program,"p");gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  const uniforms={r:gl.getUniformLocation(program,"r"),t:gl.getUniformLocation(program,"t"),m:gl.getUniformLocation(program,"m")};
+  let pointer=[0,0],target=[0,0],raf=0,started=performance.now(),visible=true;
+  const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const resize=()=>{const box=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,1.5);canvas.width=Math.max(1,Math.floor(box.width*dpr));canvas.height=Math.max(1,Math.floor(box.height*dpr));gl.viewport(0,0,canvas.width,canvas.height);};
+  const move=e=>{const b=canvas.getBoundingClientRect();target=[((e.clientX-b.left)/b.width-.5)*2,((e.clientY-b.top)/b.height-.5)*-2];};
+  canvas.addEventListener("pointermove",move,{passive:true});canvas.addEventListener("pointerleave",()=>target=[0,0]);
+  const draw=now=>{if(!visible)return;pointer[0]+=(target[0]-pointer[0])*.045;pointer[1]+=(target[1]-pointer[1])*.045;gl.uniform2f(uniforms.r,canvas.width,canvas.height);gl.uniform1f(uniforms.t,reduced?0:(now-started)*.001);gl.uniform2f(uniforms.m,pointer[0],pointer[1]);gl.drawArrays(gl.TRIANGLES,0,6);if(!reduced)raf=requestAnimationFrame(draw);};
+  const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible){cancelAnimationFrame(raf);draw(performance.now());}else cancelAnimationFrame(raf);});observer.observe(canvas);
+  new ResizeObserver(resize).observe(canvas);resize();draw(performance.now());
+ }catch(err){canvas.classList.add("dimension-fallback");console.warn("FXI Dimension unavailable",err);}
+})();
