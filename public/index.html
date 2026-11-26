@@ -8,9 +8,16 @@
   <title>FXI BotForge — خانه سازندگان</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/styles.css?v=fxi-visual-20261126-r11">
-  <style>.guest-preview .topbar nav,.guest-preview .trust-strip,.guest-preview #explore,.guest-preview .live-metrics,.guest-preview .how-section,.guest-preview footer,.guest-preview .hero-actions .text-link{display:none!important}.guest-preview .hero{min-height:calc(100vh - 84px);display:flex;align-items:center}.guest-preview .hero-shell{padding-top:72px;padding-bottom:72px}.guest-preview .hero-copy{max-width:620px}.guest-preview .hero-actions{margin-top:30px}.guest-preview .topbar{justify-content:space-between}</style>
-  <script src="/app.js?v=fxi-features-20261125-r1" defer></script>
+  <link rel="stylesheet" href="/styles.css?v=fxi-folds-20261126-r12">
+  <style>
+.guest-preview .topbar nav,.guest-preview footer,.guest-preview .hero-actions .text-link{display:none!important}
+.guest-preview .hero{min-height:0;display:flex;align-items:center}
+.guest-preview .hero-shell{padding-top:34px;padding-bottom:34px}
+.guest-preview .hero-copy{max-width:620px}
+.guest-preview .hero-actions{margin-top:22px}
+.guest-preview .topbar{justify-content:space-between}
+</style>
+  <script src="/app.js?v=fxi-folds-20261126-r12" defer></script>
   <link rel="icon" type="image/webp" href="/assets/cyrus-hero.webp">
 </head>
 <body class="page-home guest-preview">
@@ -39,32 +46,40 @@
       </div>
     </section>
 
-    <section class="trust-strip" id="features" aria-label="ویژگی‌های اصلی">
+    <section class="home-accordion" aria-label="بخش‌های سایت">
+      <details class="home-fold">
+        <summary><span class="fold-icon">✦</span><span class="fold-copy"><b>امکانات BotForge</b><small>کتابخانه، انتشار پروژه و بررسی درخواست‌ها</small></span><span class="fold-action">مشاهده جزئیات <i>＋</i></span></summary>
+        <div class="fold-content"><section class="trust-strip" id="features" aria-label="ویژگی‌های اصلی">
       <article class="trust-item"><span class="trust-icon">⌘</span><span><b>کتابخانه قابل جست‌وجو</b><small>پروژه‌ها را بر اساس نام و دسته پیدا کن.</small></span></article>
       <article class="trust-item"><span class="trust-icon">⇧</span><span><b>انتشار ساده پروژه</b><small>کد و فایل پروژه‌ات را ارسال کن.</small></span></article>
       <article class="trust-item"><span class="trust-icon">◈</span><span><b>فرآیند بررسی شفاف</b><small>وضعیت درخواست را در فضای شخصی ببین.</small></span></article>
-    </section>
-
-    <section class="section" id="explore">
+    </section></div>
+      </details>
+      <details class="home-fold">
+        <summary><span class="fold-icon">⌘</span><span class="fold-copy"><b>پروژه‌ها و آمار جامعه</b><small>پروژه‌های منتشرشده و فعالیت سازندگان</small></span><span class="fold-action">مشاهده جزئیات <i>＋</i></span></summary>
+        <div class="fold-content"><section class="section" id="explore">
       <div class="section-heading"><div><div class="eyebrow">THE COMMUNITY LIBRARY</div><h2>چیزی برای ساختن پیدا کن.</h2></div><div class="catalog-live-tools"><span class="live-indicator" id="live-status" data-state="offline" role="status" aria-live="polite"><i></i><span data-live-label>در حال اتصال…</span></span><span class="muted" id="bot-count">در حال دریافت کتابخانه…</span><button id="catalog-refresh" class="quiet-button catalog-refresh" type="button">↻ تازه‌سازی</button></div></div>
       <div class="catalog-updated" id="catalog-updated">در حال همگام‌سازی اطلاعات…</div><div class="catalog-tools"><input id="catalog-search" type="search" placeholder="نام پروژه، موضوع یا قابلیت موردنظرت…" aria-label="جست‌وجوی پروژه‌ها"><select id="catalog-category" aria-label="فیلتر دسته‌بندی"><option value="">همه دسته‌ها</option><option>مدیریت گروه</option><option>ابزار کاربردی</option><option>هوش مصنوعی</option><option>سرگرمی</option><option>فروشگاهی</option><option>سایر</option></select></div>
       <div class="bot-grid" id="bot-list" aria-live="polite" aria-busy="true"><div class="empty-state">کتابخانه در حال بارگذاری است…</div></div>
     </section>
-    <section class="live-metrics" aria-label="آمار زنده جامعه">
+<section class="live-metrics" aria-label="آمار زنده جامعه">
       <div><span class="eyebrow">COMMUNITY IN MOTION</span><h2>جامعه‌ای که هر روز رشد می‌کند.</h2></div>
       <article><span>پروژه‌های منتشرشده</span><strong data-live-stat="projects">—</strong><small>از کتابخانه عمومی</small></article>
       <article><span>سازندگان عضو</span><strong data-live-stat="creators">—</strong><small>حساب‌های فعال</small></article>
       <article><span>دریافت فایل‌ها</span><strong data-live-stat="downloads">—</strong><small>دریافت‌های ثبت‌شده</small></article>
-    </section>
-
-
-    <section class="how-section" id="how">
+    </section></div>
+      </details>
+      <details class="home-fold">
+        <summary><span class="fold-icon">↗</span><span class="fold-copy"><b>مسیر انتشار پروژه</b><small>از ثبت سورس تا نمایش در کتابخانه</small></span><span class="fold-action">مشاهده جزئیات <i>＋</i></span></summary>
+        <div class="fold-content"><section class="how-section" id="how">
       <div><div class="eyebrow">MADE FOR BUILDERS</div><h2>از اولین commit<br>تا انتشار در جامعه.</h2><p class="hero-copy">مسیر انتشار را روشن و قابل پیگیری نگه داشته‌ایم تا به‌جای درگیر شدن با فرایندها، روی ساختن تمرکز کنی.</p></div>
       <div class="steps">
         <article><span>01</span><div><h3>پروژه‌ات را آماده کن</h3><p>کد یا فایل پروژه را همراه توضیحات کاربردی ثبت کن.</p></div></article>
         <article><span>02</span><div><h3>درخواست را پیگیری کن</h3><p>وضعیت بررسی و اعلان‌های مربوط به پروژه در فضای شخصی نمایش داده می‌شود.</p></div></article>
         <article><span>03</span><div><h3>با دیگران به اشتراک بگذار</h3><p>پس از تأیید، پروژه در کتابخانه عمومی قرار می‌گیرد.</p></div></article>
       </div>
+    </section></div>
+      </details>
     </section>
   <section class="announcement-slot" id="announcement-slot" aria-label="اطلاع‌رسانی عمومی" hidden><div id="announcement-feed" class="announcement-feed"></div></section>
 </main>
